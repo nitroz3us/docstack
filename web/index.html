@@ -686,7 +686,7 @@
                 }
 
                 // Generate and download
-                loadingText.textContent = 'Generating PDF...';
+                loadingText.textContent = 'Merging PDF...';
                 const pdfBytes = await mergedPdf.save();
                 
                 const blob = new Blob([pdfBytes], { type: 'application/pdf' });
