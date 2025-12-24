@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docstack - Merge PDFs</title>
+    <meta name="description" content="Merge, splice, and rotate PDF files directly in your browser. No uploads, completely private.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        .drop-zone.dragover {
+            border-color: #374151;
+            background-color: #f9fafb;
+        }
+        .sortable-ghost {
+            opacity: 0.4;
+        }
+        .sortable-chosen {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .pdf-card:hover .delete-btn {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans antialiased">
+    <div class="max-w-4xl mx-auto px-6 py-12">
+        <!-- Header -->
+        <header class="text-center mb-12">
+            <h1 class="text-3xl font-semibold text-gray-900 tracking-tight">Docstack</h1>
+            <p class="mt-2 text-gray-500 text-sm">Merge, splice, and rotate your PDFs</p>
+            <p class="mt-1 text-gray-400 text-xs">100% client-side • Your files never leave your device</p>
+        </header>
+
+        <!-- Drop Zone -->
+        <div id="dropZone" class="drop-zone border-2 border-dashed border-gray-300 rounded-xl p-12 text-center cursor-pointer transition-all duration-200 hover:border-gray-400 hover:bg-gray-50/50 mb-8">
+            <input type="file" id="fileInput" accept=".pdf" multiple class="hidden">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p class="text-gray-600 font-medium">Drop PDF files here</p>
+            <p class="text-gray-400 text-sm mt-1">or click to browse</p>
+        </div>
+
+        <!-- PDF List -->
+        <div id="pdfList" class="flex flex-col gap-4 mb-8">
+            <!-- PDF cards will be inserted here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-8 text-gray-400 text-sm">
+            No PDFs uploaded yet
+        </div>
+
+        <!-- Merge Button -->
+        <div id="mergeSection" class="hidden">
+            <button id="mergeBtn" class="w-full bg-gray-900 text-white py-3.5 px-6 rounded-lg font-medium text-sm transition-all duration-200 hover:bg-gray-800 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>Merge & Download</span>
+            </button>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="hidden fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="text-center">
+                <div class="w-10 h-10 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="text-gray-600 text-sm" id="loadingText">Processing...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Preview Lightbox -->
+    <div id="pageLightbox" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="relative w-full h-full max-w-6xl flex flex-col items-center justify-center">
+            
+            <!-- Header (Floating)-->
+            <div class="absolute top-0 right-0 left-0 flex items-center justify-between p-4 z-20 pointer-events-none">
+                <span id="lightboxTitle" class="text-sm font-medium text-white/80 drop-shadow-md"></span>
+                <button id="closeLightbox" class="pointer-events-auto text-white/70 hover:text-white transition-colors bg-black/20 hover:bg-black/40 rounded-full p-2 backdrop-blur-md">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Navigation Buttons -->
+            <button id="prevPageBtn" class="absolute left-4 top-1/2 -translate-y-1/2 z-20 text-white/50 hover:text-white transition-colors p-2 hover:bg-black/20 rounded-full hidden">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
+            <button id="nextPageBtn" class="absolute right-4 top-1/2 -translate-y-1/2 z-20 text-white/50 hover:text-white transition-colors p-2 hover:bg-black/20 rounded-full hidden">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+            </button>
+
+            <!-- Content -->
+            <div class="flex items-center justify-center w-full h-full overflow-hidden p-2 relative">
+                <canvas id="lightboxCanvas" class="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+        <div class="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div class="flex items-center justify-between p-4 border-b border-gray-100">
+                <h3 class="font-medium text-gray-900">Page Selection Syntax</h3>
+                <button id="closeHelpModal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="p-5 text-sm">
+                <p class="text-gray-500 mb-4">Leave empty to include all pages, or use these rules:</p>
+                
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3">
+                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono min-w-[80px]">1..3</code>
+                        <span class="text-gray-600">Pages 1 through 3</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono min-w-[80px]">1, 3, 5</code>
+                        <span class="text-gray-600">Pages 1, 3, and 5</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono min-w-[80px]">-1</code>
+                        <span class="text-gray-600">Last page</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono min-w-[80px]">2..</code>
+                        <span class="text-gray-600">Page 2 to end</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono min-w-[80px]">3..1</code>
+                        <span class="text-gray-600">Pages 3 to 1 (reverse)</span>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import PDF.js for previews
+        const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+
+        // pdf-lib is loaded globally as PDFLib
+        const { PDFDocument, degrees } = PDFLib;
+
+        // State - stores file data in memory
+        let uploadedFiles = []; // { id, name, arrayBuffer, pageCount, rules }
+        let currentLightboxState = { fileId: null, orderIndex: 0 };
+
+        // DOM Elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const pdfList = document.getElementById('pdfList');
+        const emptyState = document.getElementById('emptyState');
+        const mergeSection = document.getElementById('mergeSection');
+        const mergeBtn = document.getElementById('mergeBtn');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const helpModal = document.getElementById('helpModal');
+        const closeHelpModal = document.getElementById('closeHelpModal');
+        const pageLightbox = document.getElementById('pageLightbox');
+        const lightboxTitle = document.getElementById('lightboxTitle');
+        const lightboxCanvas = document.getElementById('lightboxCanvas');
+        const closeLightbox = document.getElementById('closeLightbox');
+        const prevPageBtn = document.getElementById('prevPageBtn');
+        const nextPageBtn = document.getElementById('nextPageBtn');
+
+        // Initialize Sortable
+        new Sortable(pdfList, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onEnd: () => {
+                const newOrder = [];
+                pdfList.querySelectorAll('.pdf-card').forEach(card => {
+                    const fileId = card.dataset.fileId;
+                    const file = uploadedFiles.find(f => f.id === fileId);
+                    if (file) newOrder.push(file);
+                });
+                uploadedFiles = newOrder;
+            }
+        });
+
+        // Event Listeners
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFiles);
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles({ target: { files: e.dataTransfer.files } });
+        });
+
+        mergeBtn.addEventListener('click', mergePDFs);
+        closeHelpModal.addEventListener('click', () => helpModal.classList.add('hidden'));
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) helpModal.classList.add('hidden');
+        });
+        closeLightbox.addEventListener('click', () => pageLightbox.classList.add('hidden'));
+        pageLightbox.addEventListener('click', (e) => {
+            if (e.target === pageLightbox) pageLightbox.classList.add('hidden');
+        });
+
+        // Lightbox Navigation Handlers
+        prevPageBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            changeLightboxPage(-1);
+        });
+        nextPageBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            changeLightboxPage(1);
+        });
+        document.addEventListener('keydown', (e) => {
+            if (pageLightbox.classList.contains('hidden')) return;
+            if (e.key === 'ArrowLeft') changeLightboxPage(-1);
+            if (e.key === 'ArrowRight') changeLightboxPage(1);
+            if (e.key === 'Escape') pageLightbox.classList.add('hidden');
+        });
+
+        // Show page in lightbox
+        async function showPageLightbox(fileId, orderIndex) {
+            currentLightboxState = { fileId, orderIndex };
+            pageLightbox.classList.remove('hidden');
+            await renderLightboxPage();
+        }
+
+        // Render current lightbox page
+        async function renderLightboxPage() {
+            const { fileId, orderIndex } = currentLightboxState;
+            const file = uploadedFiles.find(f => f.id === fileId);
+            if (!file) return;
+
+            const pageIndex = file.pageOrder[orderIndex]; // Real page index (0-based)
+            const pageNum = pageIndex + 1;
+            const rotation = file.pageRotations[pageIndex];
+
+            lightboxTitle.textContent = `${file.name} - Page ${pageNum}`;
+            
+            // Render at higher resolution for lightbox
+            await renderPdfPage(file.arrayBuffer, pageNum, lightboxCanvas, 1.5);
+            
+            // Apply rotation via CSS
+            lightboxCanvas.style.transform = rotation ? `rotate(${rotation}deg)` : '';
+
+            // Update Navigation Buttons
+            if (orderIndex > 0) {
+                prevPageBtn.classList.remove('hidden');
+            } else {
+                prevPageBtn.classList.add('hidden');
+            }
+
+            if (orderIndex < file.pageOrder.length - 1) {
+                nextPageBtn.classList.remove('hidden');
+            } else {
+                nextPageBtn.classList.add('hidden');
+            }
+        }
+
+        // Change page in lightbox
+        function changeLightboxPage(delta) {
+            const { fileId, orderIndex } = currentLightboxState;
+            const file = uploadedFiles.find(f => f.id === fileId);
+            if (!file) return;
+
+            const newIndex = orderIndex + delta;
+            if (newIndex >= 0 && newIndex < file.pageOrder.length) {
+                currentLightboxState.orderIndex = newIndex;
+                renderLightboxPage();
+            }
+        }
+
+        // Parse page rules (e.g., "1..3, 5, -1>")
+        function parseRules(rulesStr, pageCount) {
+            if (!rulesStr.trim()) {
+                // Default: all pages, no rotation
+                return Array.from({ length: pageCount }, (_, i) => ({ page: i, rotation: 0 }));
+            }
+
+            const results = [];
+            const parts = rulesStr.replace(/\s/g, '').split(',');
+
+            for (const part of parts) {
+                // Match: optional start, optional .., optional end, optional rotation
+                const match = part.match(/^(-?\d+)?(\.\.)?(-?\d+)?([>V<])?$/);
+                if (!match) continue;
+
+                let [, startStr, hasRange, endStr, rotation] = match;
+                const rotationDegrees = { '>': 90, 'V': 180, '<': 270 }[rotation] || 0;
+
+                // Convert to 0-indexed
+                let start = startStr ? parseInt(startStr) : 1;
+                let end = endStr ? parseInt(endStr) : (hasRange ? pageCount : start);
+
+                // Handle negative indices
+                if (start < 0) start = pageCount + start + 1;
+                if (end < 0) end = pageCount + end + 1;
+
+                // Clamp to valid range
+                start = Math.max(1, Math.min(pageCount, start));
+                end = Math.max(1, Math.min(pageCount, end));
+
+                // If range indicator present without explicit start
+                if (hasRange && !startStr) start = 1;
+                if (hasRange && !endStr) end = pageCount;
+
+                // Generate page indices (convert to 0-indexed)
+                if (start <= end) {
+                    for (let i = start; i <= end; i++) {
+                        results.push({ page: i - 1, rotation: rotationDegrees });
+                    }
+                } else {
+                    // Reverse range
+                    for (let i = start; i >= end; i--) {
+                        results.push({ page: i - 1, rotation: rotationDegrees });
+                    }
+                }
+            }
+
+            return results;
+        }
+
+        // Render PDF page to canvas using PDF.js
+        async function renderPdfPage(arrayBuffer, pageNum, canvas, scale = 0.5) {
+            try {
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                const page = await pdf.getPage(pageNum);
+                
+                const viewport = page.getViewport({ scale });
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                
+                const ctx = canvas.getContext('2d');
+                await page.render({ canvasContext: ctx, viewport }).promise;
+                
+                return true;
+            } catch (error) {
+                console.error('Error rendering PDF:', error);
+                return false;
+            }
+        }
+
+        // Handle file uploads
+        async function handleFiles(e) {
+            const files = Array.from(e.target.files).filter(f => f.type === 'application/pdf');
+            if (files.length === 0) return;
+
+            showLoading('Loading PDFs...');
+
+            for (const file of files) {
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdfDoc = await PDFDocument.load(arrayBuffer);
+                    const pageCount = pdfDoc.getPageCount();
+
+                    const fileData = {
+                        id: crypto.randomUUID(),
+                        name: file.name,
+                        arrayBuffer: arrayBuffer,
+                        pageCount: pageCount,
+                        rules: '',
+                        pageRotations: Array(pageCount).fill(0), // Track rotation per page (0, 90, 180, 270)
+                        pageOrder: Array.from({ length: pageCount }, (_, i) => i) // Custom page order [0, 1, 2, ...]
+                    };
+
+                    uploadedFiles.push(fileData);
+                    await addPdfCard(fileData);
+                } catch (error) {
+                    console.error('Error loading PDF:', error);
+                    alert(`Failed to load ${file.name}: ${error.message}`);
+                }
+            }
+
+            hideLoading();
+            updateUI();
+            fileInput.value = '';
+        }
+
+        // Add PDF card to the list
+        async function addPdfCard(file) {
+            const card = document.createElement('div');
+            card.className = 'pdf-card bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all';
+            card.dataset.fileId = file.id;
+
+            card.innerHTML = `
+                <!-- Card Header (always visible) -->
+                <div class="card-header flex items-center gap-4 p-4 cursor-pointer">
+                    <div class="relative w-16 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                        <canvas class="pdf-preview w-full h-full object-cover"></canvas>
+                        <div class="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                            ${file.pageCount}
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate" title="${file.name}">${file.name}</p>
+                        <p class="text-xs text-gray-400 mt-0.5">${file.pageCount} page${file.pageCount > 1 ? 's' : ''}</p>
+                        <div class="flex items-center gap-2 mt-2">
+                            <input 
+                                type="text" 
+                                placeholder="Pages (e.g. 1..3, 5)"
+                                class="rules-input flex-1 text-xs px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-gray-400"
+                                data-file-id="${file.id}"
+                                onclick="event.stopPropagation()"
+                            >
+                            <button type="button" class="help-btn text-gray-400 hover:text-gray-600 p-1" onclick="event.stopPropagation()">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="expand-icon w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <button class="delete-btn text-gray-400 hover:text-red-500 p-1" data-file-id="${file.id}" onclick="event.stopPropagation()">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Expanded Pages (hidden by default) -->
+                <div class="pages-panel hidden border-t border-gray-100 bg-gray-50 p-4">
+                    <div class="pages-grid grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                        <!-- Page thumbnails will be inserted here -->
+                    </div>
+                </div>
+            `;
+
+            // Add event listeners
+            card.querySelector('.card-header').addEventListener('click', () => {
+                toggleExpand(file.id, card);
+            });
+            
+            card.querySelector('.delete-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteFile(file.id);
+            });
+            
+            card.querySelector('.rules-input').addEventListener('change', (e) => {
+                updateRules(file.id, e.target.value);
+            });
+            
+            card.querySelector('.help-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                helpModal.classList.remove('hidden');
+            });
+
+            pdfList.appendChild(card);
+
+            // Render first page preview
+            const canvas = card.querySelector('.pdf-preview');
+            await renderPdfPage(file.arrayBuffer, 1, canvas, 0.4);
+        }
+        
+        // Toggle card expansion
+        async function toggleExpand(fileId, card) {
+            const file = uploadedFiles.find(f => f.id === fileId);
+            if (!file) return;
+            
+            const panel = card.querySelector('.pages-panel');
+            const icon = card.querySelector('.expand-icon');
+            const grid = card.querySelector('.pages-grid');
+            
+            const isExpanded = !panel.classList.contains('hidden');
+            
+            if (isExpanded) {
+                // Collapse
+                panel.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                // Expand
+                panel.classList.remove('hidden');
+                icon.style.transform = 'rotate(180deg)';
+                
+                // Only render pages if not already rendered
+                if (grid.children.length === 0) {
+                    // Render pages in current order
+                    for (const pageIndex of file.pageOrder) {
+                        const pageNum = pageIndex + 1;
+                        const thumb = document.createElement('div');
+                        thumb.className = 'page-thumb relative bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm group cursor-move';
+                        thumb.dataset.pageIndex = pageIndex;
+                        thumb.innerHTML = `
+                            <div class="canvas-wrapper aspect-[3/4] bg-gray-100" style="transform: rotate(${file.pageRotations[pageIndex]}deg)">
+                                <canvas class="w-full h-full"></canvas>
+                            </div>
+                            <div class="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button class="preview-page-btn w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-blue-50">
+                                    <svg class="w-3 h-3 text-gray-500 hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </button>
+                                <button class="rotate-btn w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-gray-100">
+                                    <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </button>
+                                <button class="delete-page-btn w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-red-50">
+                                    <svg class="w-3 h-3 text-gray-500 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px] text-gray-500 py-1 px-1.5 bg-white">
+                                <span class="page-num">${pageNum}</span>
+                                <span class="rotation-label text-gray-400">${file.pageRotations[pageIndex] > 0 ? file.pageRotations[pageIndex] + '°' : ''}</span>
+                            </div>
+                        `;
+                        
+                        // Rotate button handler
+                        thumb.querySelector('.rotate-btn').addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            file.pageRotations[pageIndex] = (file.pageRotations[pageIndex] + 90) % 360;
+                            
+                            const wrapper = thumb.querySelector('.canvas-wrapper');
+                            wrapper.style.transform = `rotate(${file.pageRotations[pageIndex]}deg)`;
+                            
+                            const label = thumb.querySelector('.rotation-label');
+                            label.textContent = file.pageRotations[pageIndex] > 0 ? file.pageRotations[pageIndex] + '°' : '';
+                        });
+                        
+                        // Delete page button handler
+                        thumb.querySelector('.delete-page-btn').addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            // Remove from pageOrder
+                            file.pageOrder = file.pageOrder.filter(idx => idx !== pageIndex);
+                            // Remove from DOM
+                            thumb.remove();
+                        });
+                        
+                        // Preview (Lightbox) page button handler
+                        thumb.querySelector('.preview-page-btn').addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            // Find current index in pageOrder (handling reordering)
+                            const currentOrderIndex = file.pageOrder.indexOf(pageIndex);
+                            showPageLightbox(file.id, currentOrderIndex);
+                        });
+                        
+                        grid.appendChild(thumb);
+                        
+                        const canvas = thumb.querySelector('canvas');
+                        renderPdfPage(file.arrayBuffer, pageNum, canvas, 0.3);
+                    }
+                    
+                    // Initialize sortable for pages
+                    new Sortable(grid, {
+                        animation: 150,
+                        ghostClass: 'sortable-ghost',
+                        chosenClass: 'sortable-chosen',
+                        onEnd: () => {
+                            // Update pageOrder based on new DOM order
+                            file.pageOrder = Array.from(grid.querySelectorAll('.page-thumb')).map(
+                                el => parseInt(el.dataset.pageIndex)
+                            );
+                        }
+                    });
+                }
+            }
+        }
+
+        // Update page rules for a file
+        function updateRules(fileId, rules) {
+            const file = uploadedFiles.find(f => f.id === fileId);
+            if (file) file.rules = rules;
+        }
+
+        // Delete a file
+        function deleteFile(fileId) {
+            uploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
+            const card = pdfList.querySelector(`[data-file-id="${fileId}"]`);
+            if (card) card.remove();
+            updateUI();
+        }
+
+        // Merge PDFs using pdf-lib
+        async function mergePDFs() {
+            if (uploadedFiles.length === 0) return;
+
+            showLoading('Merging PDFs...');
+
+            try {
+                const mergedPdf = await PDFDocument.create();
+
+                for (const file of uploadedFiles) {
+                    const srcDoc = await PDFDocument.load(file.arrayBuffer);
+                    
+                    // Use text rules if provided, otherwise use pageOrder (drag-and-drop order)
+                    let pagesToProcess;
+                    if (file.rules.trim()) {
+                        pagesToProcess = parseRules(file.rules, file.pageCount);
+                    } else {
+                        // Use custom pageOrder from drag-and-drop
+                        pagesToProcess = file.pageOrder.map(pageIndex => ({
+                            page: pageIndex,
+                            rotation: 0
+                        }));
+                    }
+
+                    for (const rule of pagesToProcess) {
+                        const [copiedPage] = await mergedPdf.copyPages(srcDoc, [rule.page]);
+                        
+                        // Combine text-based rotation with visual rotation
+                        const visualRotation = file.pageRotations[rule.page] || 0;
+                        const totalRotation = rule.rotation + visualRotation;
+                        
+                        if (totalRotation !== 0) {
+                            const currentRotation = copiedPage.getRotation().angle;
+                            copiedPage.setRotation(degrees(currentRotation + totalRotation));
+                        }
+                        
+                        mergedPdf.addPage(copiedPage);
+                    }
+                }
+
+                // Generate and download
+                loadingText.textContent = 'Generating PDF...';
+                const pdfBytes = await mergedPdf.save();
+                
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'merged.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                URL.revokeObjectURL(url);
+
+            } catch (error) {
+                console.error('Merge error:', error);
+                alert(`Merge failed: ${error.message}`);
+            }
+
+            hideLoading();
+        }
+
+        // UI Helpers
+        function updateUI() {
+            if (uploadedFiles.length === 0) {
+                emptyState.classList.remove('hidden');
+                mergeSection.classList.add('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                mergeSection.classList.remove('hidden');
+            }
+        }
+
+        function showLoading(text) {
+            loadingText.textContent = text;
+            loadingOverlay.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
