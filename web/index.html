@@ -195,8 +195,15 @@
         const { PDFDocument, degrees } = PDFLib;
 
         // State - stores file data in memory
-        let uploadedFiles = []; // { id, name, arrayBuffer, pageCount, rules }
+        let uploadedFiles = []; // { id, name, size, arrayBuffer, pageCount, rules, pageRotations, pageOrder }
         let currentLightboxState = { fileId: null, orderIndex: 0 };
+
+        // Format file size to human readable
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
 
         // DOM Elements
         const dropZone = document.getElementById('dropZone');
@@ -426,6 +433,7 @@
                     const fileData = {
                         id: crypto.randomUUID(),
                         name: file.name,
+                        size: file.size, // File size in bytes
                         arrayBuffer: arrayBuffer,
                         pageCount: pageCount,
                         rules: '',
@@ -462,7 +470,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-gray-900 truncate" title="${file.name}">${file.name}</p>
-                        <p class="text-xs text-gray-400 mt-0.5">${file.pageCount} page${file.pageCount > 1 ? 's' : ''}</p>
+                        <p class="text-xs text-gray-400 mt-0.5">${file.pageCount} page${file.pageCount > 1 ? 's' : ''} • ${formatFileSize(file.size)}</p>
                         <div class="flex items-center gap-2 mt-2">
                             <input 
                                 type="text" 
