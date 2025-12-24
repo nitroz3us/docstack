@@ -19,13 +19,18 @@
     <meta name="twitter:title" content="docstack - Privacy-First PDF Merger">
     <meta name="twitter:description" content="Merge, splice, and rotate PDF files directly in your browser. No uploads, completely private.">
     <meta name="twitter:image" content="https://docstack.tools/thumbnail.png">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <!-- Libraries (self-hosted for privacy and offline use) -->
+    <script src="lib/sortable.min.js"></script>
+    <script src="lib/pdf-lib.min.js"></script>
+    
+    <!-- Fonts (optional - will use system fonts offline) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- TailwindCSS (CDN for now, generates CSS on-the-fly) -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -136,7 +141,7 @@
 
             <!-- Content -->
             <div class="flex items-center justify-center w-full h-full overflow-hidden p-2 relative">
-                <canvas id="lightboxCanvas" class="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-200"></canvas>
+                <canvas id="lightboxCanvas" class="max-w-full max-h-full object-contain shadow-2xl transition-all duration-150"></canvas>
             </div>
         </div>
     </div>
@@ -182,9 +187,9 @@
     </div>
 
     <script type="module">
-        // Import PDF.js for previews
-        const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs');
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+        // Import PDF.js for previews (self-hosted)
+        const pdfjsLib = await import('./lib/pdf.min.mjs');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.min.mjs';
 
         // pdf-lib is loaded globally as PDFLib
         const { PDFDocument, degrees } = PDFLib;
@@ -281,7 +286,7 @@
         }
 
         // Render current lightbox page
-        async function renderLightboxPage() {
+        async function renderLightboxPage(animate = false) {
             const { fileId, orderIndex } = currentLightboxState;
             const file = uploadedFiles.find(f => f.id === fileId);
             if (!file) return;
@@ -292,11 +297,22 @@
 
             lightboxTitle.textContent = `${file.name} - Page ${pageNum}`;
             
+            // Fade out before rendering (for navigation transitions)
+            if (animate) {
+                lightboxCanvas.style.opacity = '0';
+                await new Promise(r => setTimeout(r, 100));
+            }
+            
             // Render at higher resolution for lightbox
             await renderPdfPage(file.arrayBuffer, pageNum, lightboxCanvas, 1.5);
             
             // Apply rotation via CSS
             lightboxCanvas.style.transform = rotation ? `rotate(${rotation}deg)` : '';
+            
+            // Fade back in
+            if (animate) {
+                lightboxCanvas.style.opacity = '1';
+            }
 
             // Update Navigation Buttons
             if (orderIndex > 0) {
@@ -313,7 +329,7 @@
         }
 
         // Change page in lightbox
-        function changeLightboxPage(delta) {
+        async function changeLightboxPage(delta) {
             const { fileId, orderIndex } = currentLightboxState;
             const file = uploadedFiles.find(f => f.id === fileId);
             if (!file) return;
@@ -321,7 +337,7 @@
             const newIndex = orderIndex + delta;
             if (newIndex >= 0 && newIndex < file.pageOrder.length) {
                 currentLightboxState.orderIndex = newIndex;
-                renderLightboxPage();
+                await renderLightboxPage(true);
             }
         }
 
