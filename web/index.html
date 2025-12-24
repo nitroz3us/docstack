@@ -91,15 +91,15 @@
     <div id="pageLightbox" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div class="relative w-full h-full max-w-6xl flex flex-col items-center justify-center">
             
-            <!-- Header (Floating)-->
-            <div class="absolute top-0 right-0 left-0 flex items-center justify-between p-4 z-20 pointer-events-none">
-                <span id="lightboxTitle" class="text-sm font-medium text-white/80 drop-shadow-md"></span>
-                <button id="closeLightbox" class="pointer-events-auto text-white/70 hover:text-white transition-colors bg-black/20 hover:bg-black/40 rounded-full p-2 backdrop-blur-md">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+            <!-- Title (Bottom Center) -->
+            <div class="absolute bottom-0 right-0 left-0 flex items-center justify-center p-4 z-20 pointer-events-none">
+                <span id="lightboxTitle" class="text-sm font-medium text-white/90 drop-shadow-md truncate max-w-[70%] bg-black/40 px-4 py-1.5 rounded-full backdrop-blur-sm pointer-events-auto text-center"></span>
             </div>
+            <button id="closeLightbox" class="absolute top-4 right-4 z-20 text-white/70 hover:text-white transition-colors bg-black/20 hover:bg-black/40 rounded-full p-2 backdrop-blur-md">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
 
             <!-- Navigation Buttons -->
             <button id="prevPageBtn" class="absolute left-4 top-1/2 -translate-y-1/2 z-20 text-white/50 hover:text-white transition-colors p-2 hover:bg-black/20 rounded-full hidden">
@@ -156,8 +156,6 @@
                         <span class="text-gray-600">Pages 3 to 1 (reverse)</span>
                     </div>
                 </div>
-
-
             </div>
         </div>
     </div>
@@ -256,8 +254,9 @@
         // Show page in lightbox
         async function showPageLightbox(fileId, orderIndex) {
             currentLightboxState = { fileId, orderIndex };
-            pageLightbox.classList.remove('hidden');
+            // Render BEFORE showing modal to prevent flicker
             await renderLightboxPage();
+            pageLightbox.classList.remove('hidden');
         }
 
         // Render current lightbox page
@@ -380,7 +379,6 @@
             const files = Array.from(e.target.files).filter(f => f.type === 'application/pdf');
             if (files.length === 0) return;
 
-            showLoading('Loading PDFs...');
 
             for (const file of files) {
                 try {
@@ -406,7 +404,6 @@
                 }
             }
 
-            hideLoading();
             updateUI();
             fileInput.value = '';
         }
