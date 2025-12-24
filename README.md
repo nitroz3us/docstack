@@ -1,4 +1,4 @@
-# Docstack
+# docstack
 
 A minimalist, privacy-focused PDF merger with advanced visual page management. Runs 100% in your browser.
 
