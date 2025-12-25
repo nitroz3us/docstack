@@ -56,10 +56,17 @@
         .pdf-card:hover .delete-btn {
             opacity: 1;
         }
+        /* Scale up UI on larger screens */
+        @media (min-width: 1280px) {
+            body { zoom: 1.1; }
+        }
+        @media (min-width: 1536px) {
+            body { zoom: 1.15; }
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans antialiased">
-    <div class="max-w-4xl mx-auto px-6 py-12">
+    <div class="max-w-5xl mx-auto px-6 py-12">
         <!-- Header -->
         <header class="text-center mb-12">
             <div class="flex items-center justify-center gap-3 mb-2">
@@ -84,9 +91,27 @@
             <p class="text-gray-400 text-sm mt-1">or click to browse</p>
         </div>
 
-        <!-- PDF List -->
+        <!-- View Toggle (shown when files exist) -->
+        <div id="viewToggle" class="hidden flex gap-1 p-1 mb-6 bg-gray-100 rounded-lg w-full">
+            <button id="byFileBtn" class="flex-1 py-1.5 text-sm font-medium text-gray-900 bg-white rounded-md shadow-sm">
+                By File
+            </button>
+            <button id="allPagesBtn" class="flex-1 py-1.5 text-sm font-medium text-gray-500 rounded-md hover:text-gray-700">
+                All Pages
+            </button>
+        </div>
+
+        <!-- PDF List (By File view) -->
         <div id="pdfList" class="flex flex-col gap-4 mb-8">
             <!-- PDF cards will be inserted here -->
+        </div>
+
+        <!-- All Pages View (hidden by default) -->
+        <div id="allPagesView" class="hidden mb-8">
+            <p class="text-xs text-gray-400 mb-3 text-center">Drag to reorder across all files • Click icons to preview, rotate, or delete</p>
+            <div id="allPagesGrid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                <!-- All page thumbnails will be inserted here -->
+            </div>
         </div>
 
         <!-- Empty State -->
@@ -222,6 +247,16 @@
         const closeLightbox = document.getElementById('closeLightbox');
         const prevPageBtn = document.getElementById('prevPageBtn');
         const nextPageBtn = document.getElementById('nextPageBtn');
+        const viewToggle = document.getElementById('viewToggle');
+        const byFileBtn = document.getElementById('byFileBtn');
+        const allPagesBtn = document.getElementById('allPagesBtn');
+        const allPagesView = document.getElementById('allPagesView');
+        const allPagesGrid = document.getElementById('allPagesGrid');
+
+        // View mode state
+        let currentView = 'byFile'; // 'byFile' or 'allPages'
+        let globalPageOrder = []; // Array of { fileId, pageIndex } for "All Pages" view
+        let allPagesRendered = false; // Track if All Pages view has been rendered
 
         // Initialize Sortable
         new Sortable(pdfList, {
@@ -267,6 +302,33 @@
         pageLightbox.addEventListener('click', (e) => {
             if (e.target === pageLightbox) pageLightbox.classList.add('hidden');
         });
+
+        // View Toggle Handlers
+        byFileBtn.addEventListener('click', () => switchView('byFile'));
+        allPagesBtn.addEventListener('click', () => switchView('allPages'));
+
+        function switchView(view) {
+            currentView = view;
+            if (view === 'byFile') {
+                byFileBtn.classList.add('bg-white', 'shadow-sm', 'text-gray-900');
+                byFileBtn.classList.remove('text-gray-500');
+                allPagesBtn.classList.remove('bg-white', 'shadow-sm', 'text-gray-900');
+                allPagesBtn.classList.add('text-gray-500');
+                pdfList.classList.remove('hidden');
+                allPagesView.classList.add('hidden');
+            } else {
+                allPagesBtn.classList.add('bg-white', 'shadow-sm', 'text-gray-900');
+                allPagesBtn.classList.remove('text-gray-500');
+                byFileBtn.classList.remove('bg-white', 'shadow-sm', 'text-gray-900');
+                byFileBtn.classList.add('text-gray-500');
+                pdfList.classList.add('hidden');
+                allPagesView.classList.remove('hidden');
+                // Only render if not already rendered
+                if (!allPagesRendered) {
+                    renderAllPagesView();
+                }
+            }
+        }
 
         // Lightbox Navigation Handlers
         prevPageBtn.addEventListener('click', (e) => {
@@ -346,6 +408,108 @@
                 currentLightboxState.orderIndex = newIndex;
                 await renderLightboxPage(true);
             }
+        }
+
+        // Render all pages from all files in a single grid
+        async function renderAllPagesView() {
+            allPagesGrid.innerHTML = '';
+            
+            // Build global page order if not already set
+            if (globalPageOrder.length === 0) {
+                for (const file of uploadedFiles) {
+                    for (const pageIndex of file.pageOrder) {
+                        globalPageOrder.push({ fileId: file.id, pageIndex });
+                    }
+                }
+            }
+
+            // Render each page
+            for (let i = 0; i < globalPageOrder.length; i++) {
+                const { fileId, pageIndex } = globalPageOrder[i];
+                const file = uploadedFiles.find(f => f.id === fileId);
+                if (!file) continue;
+
+                const pageNum = pageIndex + 1;
+                const thumb = document.createElement('div');
+                thumb.className = 'page-thumb relative bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-move';
+                thumb.dataset.globalIndex = i;
+                thumb.dataset.fileId = fileId;
+                thumb.dataset.pageIndex = pageIndex;
+                
+                // Color code by file
+                const fileIndex = uploadedFiles.indexOf(file);
+                const colors = ['border-l-blue-400', 'border-l-green-400', 'border-l-purple-400', 'border-l-orange-400', 'border-l-pink-400'];
+                const colorClass = colors[fileIndex % colors.length];
+                
+                thumb.innerHTML = `
+                    <div class="canvas-wrapper aspect-[3/4] bg-gray-100 border-l-4 ${colorClass} relative" style="transform: rotate(${file.pageRotations[pageIndex]}deg)">
+                        <canvas class="w-full h-full"></canvas>
+                        <div class="absolute top-1 right-1 flex gap-1">
+                            <button class="preview-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-blue-50 hover:shadow" title="Preview">
+                                <svg class="w-4 h-4 text-gray-500 hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </button>
+                            <button class="rotate-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-100 hover:shadow" title="Rotate 90°">
+                                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                            <button class="delete-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-red-50 hover:shadow" title="Delete page">
+                                <svg class="w-4 h-4 text-gray-500 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-gray-500 py-1 px-1.5 bg-white">
+                        <span class="truncate" title="${file.name}">${file.name.slice(0, 10)}${file.name.length > 10 ? '...' : ''}</span>
+                        <span>p${pageNum}</span>
+                    </div>
+                `;
+
+                // Event handlers
+                thumb.querySelector('.rotate-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    file.pageRotations[pageIndex] = (file.pageRotations[pageIndex] + 90) % 360;
+                    thumb.querySelector('.canvas-wrapper').style.transform = `rotate(${file.pageRotations[pageIndex]}deg)`;
+                });
+
+                thumb.querySelector('.delete-page-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    globalPageOrder.splice(i, 1);
+                    renderAllPagesView();
+                    updateUI();
+                });
+
+                thumb.querySelector('.preview-page-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showPageLightbox(fileId, file.pageOrder.indexOf(pageIndex));
+                });
+
+                allPagesGrid.appendChild(thumb);
+                
+                // Render thumbnail
+                const canvas = thumb.querySelector('canvas');
+                renderPdfPage(file.arrayBuffer, pageNum, canvas, 0.3);
+            }
+
+            // Initialize sortable for all pages grid
+            new Sortable(allPagesGrid, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                onEnd: () => {
+                    // Update globalPageOrder based on new DOM order
+                    globalPageOrder = Array.from(allPagesGrid.querySelectorAll('.page-thumb')).map(el => ({
+                        fileId: el.dataset.fileId,
+                        pageIndex: parseInt(el.dataset.pageIndex)
+                    }));
+                }
+            });
+            
+            allPagesRendered = true;
         }
 
         // Parse page rules (e.g., "1..3, 5, -1>")
@@ -500,6 +664,7 @@
                 
                 <!-- Expanded Pages (hidden by default) -->
                 <div class="pages-panel hidden border-t border-gray-100 bg-gray-50 p-4">
+                    <p class="text-xs text-gray-400 mb-3 text-center">Drag to reorder • Click icons to preview, rotate, or delete</p>
                     <div class="pages-grid grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
                         <!-- Page thumbnails will be inserted here -->
                     </div>
@@ -564,20 +729,20 @@
                             <div class="canvas-wrapper aspect-[3/4] bg-gray-100" style="transform: rotate(${file.pageRotations[pageIndex]}deg)">
                                 <canvas class="w-full h-full"></canvas>
                             </div>
-                            <div class="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button class="preview-page-btn w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-blue-50">
-                                    <svg class="w-3 h-3 text-gray-500 hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="absolute top-1 right-1 flex gap-1">
+                                <button class="preview-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-blue-50 hover:shadow" title="Preview">
+                                    <svg class="w-4 h-4 text-gray-500 hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                 </button>
-                                <button class="rotate-btn w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-gray-100">
-                                    <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <button class="rotate-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-100 hover:shadow" title="Rotate 90°">
+                                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                     </svg>
                                 </button>
-                                <button class="delete-page-btn w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-red-50">
-                                    <svg class="w-3 h-3 text-gray-500 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <button class="delete-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-red-50 hover:shadow" title="Delete page">
+                                    <svg class="w-4 h-4 text-gray-500 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </button>
@@ -662,34 +827,63 @@
             try {
                 const mergedPdf = await PDFDocument.create();
 
-                for (const file of uploadedFiles) {
-                    const srcDoc = await PDFDocument.load(file.arrayBuffer);
+                // If in "All Pages" mode and globalPageOrder is set, use that order
+                if (currentView === 'allPages' && globalPageOrder.length > 0) {
+                    // Cache loaded documents to avoid reloading
+                    const docCache = {};
                     
-                    // Use text rules if provided, otherwise use pageOrder (drag-and-drop order)
-                    let pagesToProcess;
-                    if (file.rules.trim()) {
-                        pagesToProcess = parseRules(file.rules, file.pageCount);
-                    } else {
-                        // Use custom pageOrder from drag-and-drop
-                        pagesToProcess = file.pageOrder.map(pageIndex => ({
-                            page: pageIndex,
-                            rotation: 0
-                        }));
-                    }
+                    for (const { fileId, pageIndex } of globalPageOrder) {
+                        const file = uploadedFiles.find(f => f.id === fileId);
+                        if (!file) continue;
 
-                    for (const rule of pagesToProcess) {
-                        const [copiedPage] = await mergedPdf.copyPages(srcDoc, [rule.page]);
+                        // Load document if not cached
+                        if (!docCache[fileId]) {
+                            docCache[fileId] = await PDFDocument.load(file.arrayBuffer);
+                        }
+                        const srcDoc = docCache[fileId];
                         
-                        // Combine text-based rotation with visual rotation
-                        const visualRotation = file.pageRotations[rule.page] || 0;
-                        const totalRotation = rule.rotation + visualRotation;
+                        const [copiedPage] = await mergedPdf.copyPages(srcDoc, [pageIndex]);
                         
-                        if (totalRotation !== 0) {
+                        // Apply rotation
+                        const rotation = file.pageRotations[pageIndex] || 0;
+                        if (rotation !== 0) {
                             const currentRotation = copiedPage.getRotation().angle;
-                            copiedPage.setRotation(degrees(currentRotation + totalRotation));
+                            copiedPage.setRotation(degrees(currentRotation + rotation));
                         }
                         
                         mergedPdf.addPage(copiedPage);
+                    }
+                } else {
+                    // Original "By File" mode logic
+                    for (const file of uploadedFiles) {
+                        const srcDoc = await PDFDocument.load(file.arrayBuffer);
+                        
+                        // Use text rules if provided, otherwise use pageOrder (drag-and-drop order)
+                        let pagesToProcess;
+                        if (file.rules.trim()) {
+                            pagesToProcess = parseRules(file.rules, file.pageCount);
+                        } else {
+                            // Use custom pageOrder from drag-and-drop
+                            pagesToProcess = file.pageOrder.map(pageIndex => ({
+                                page: pageIndex,
+                                rotation: 0
+                            }));
+                        }
+
+                        for (const rule of pagesToProcess) {
+                            const [copiedPage] = await mergedPdf.copyPages(srcDoc, [rule.page]);
+                            
+                            // Combine text-based rotation with visual rotation
+                            const visualRotation = file.pageRotations[rule.page] || 0;
+                            const totalRotation = rule.rotation + visualRotation;
+                            
+                            if (totalRotation !== 0) {
+                                const currentRotation = copiedPage.getRotation().angle;
+                                copiedPage.setRotation(degrees(currentRotation + totalRotation));
+                            }
+                            
+                            mergedPdf.addPage(copiedPage);
+                        }
                     }
                 }
 
@@ -719,12 +913,26 @@
 
         // UI Helpers
         function updateUI() {
+            // Reset cache flags when files change (will rebuild on next render)
+            globalPageOrder = [];
+            allPagesRendered = false;
+            
             if (uploadedFiles.length === 0) {
                 emptyState.classList.remove('hidden');
                 mergeSection.classList.add('hidden');
+                viewToggle.classList.add('hidden');
+                pdfList.classList.remove('hidden');
+                allPagesView.classList.add('hidden');
+                currentView = 'byFile';
             } else {
                 emptyState.classList.add('hidden');
                 mergeSection.classList.remove('hidden');
+                viewToggle.classList.remove('hidden');
+                
+                // Re-render all pages view if it's active (files changed)
+                if (currentView === 'allPages') {
+                    renderAllPagesView();
+                }
             }
         }
 
