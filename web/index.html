@@ -426,13 +426,14 @@
                 thumb.dataset.fileId = fileId;
                 thumb.dataset.pageIndex = pageIndex;
                 
-                // Color code by file
+                // Color code by file (dynamic hue)
                 const fileIndex = uploadedFiles.indexOf(file);
-                const colors = ['border-l-blue-400', 'border-l-green-400', 'border-l-purple-400', 'border-l-orange-400', 'border-l-pink-400'];
-                const colorClass = colors[fileIndex % colors.length];
+                // Start at Blue (210deg) instead of Red (0deg)
+                const hue = ((fileIndex * 137.508) + 210) % 360; 
+                const colorStyle = `border-left-color: hsl(${hue}, 70%, 50%);`;
                 
                 thumb.innerHTML = `
-                    <div class="canvas-wrapper aspect-[3/4] bg-gray-100 border-l-4 ${colorClass} relative" style="transform: rotate(${file.pageRotations[pageIndex]}deg)">
+                    <div class="canvas-wrapper aspect-[3/4] bg-gray-100 border-l-4 relative" style="${colorStyle} transform: rotate(${file.pageRotations[pageIndex]}deg)">
                         <canvas class="w-full h-full"></canvas>
                         <div class="absolute top-1 right-1 flex gap-1">
                             <button class="preview-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-blue-50 hover:shadow" title="Preview">
@@ -596,14 +597,18 @@
                     };
 
                     uploadedFiles.push(fileData);
+                    
+                    // Update UI immediately (show lists, toggle)
+                    updateUI();
+                    
+                    // Render card (includes async thumbnail)
                     await addPdfCard(fileData);
                 } catch (error) {
                     console.error('Error loading PDF:', error);
                     alert(`Failed to load ${file.name}: ${error.message}`);
                 }
             }
-
-            updateUI();
+            
             fileInput.value = '';
         }
 
