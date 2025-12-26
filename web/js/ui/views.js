@@ -682,3 +682,58 @@ export function switchView(view, elements, handlers) {
         }
     }
 }
+
+/**
+ * Update a page thumbnail's identity (file ownership) in Pages view
+ * Called when a page is moved between files
+ */
+export function updatePageIdentity(oldFileId, oldIndex, newFileId, newIndex) {
+    // Find in Pages grid
+    const thumb = allPagesGrid.querySelector(
+        `.page-thumb[data-file-id="${oldFileId}"][data-page-index="${oldIndex}"]`
+    );
+    if (!thumb) return;
+
+    thumb.dataset.fileId = newFileId;
+    thumb.dataset.pageIndex = newIndex;
+
+    // Update color
+    const fileIndex = state.uploadedFiles.findIndex(f => f.id === newFileId);
+    if (fileIndex !== -1) {
+        const hue = getFileHue(fileIndex);
+        const wrapper = thumb.querySelector('.canvas-wrapper');
+        if (wrapper) {
+            wrapper.style.borderLeftColor = `hsl(${hue}, 70%, 50%)`;
+        }
+    }
+}
+
+/**
+ * Sync Pages view DOM order with global state
+ * Preserves existing rendered thumbnails, just reorders them
+ */
+export function syncPagesViewOrder() {
+    state.buildGlobalPageOrder();
+
+    // Map existing thumbs
+    const existingThumbs = new Map();
+    Array.from(allPagesGrid.children).forEach(el => {
+        existingThumbs.set(`${el.dataset.fileId}-${el.dataset.pageIndex}`, el);
+    });
+
+    const fragment = document.createDocumentFragment();
+
+    // Reorder based on new global order
+    state.globalPageOrder.forEach(({ fileId, pageIndex }) => {
+        const thumb = existingThumbs.get(`${fileId}-${pageIndex}`);
+        if (thumb) {
+            fragment.appendChild(thumb);
+        }
+    });
+
+    // Clear any orphans (items not in global order)
+    allPagesGrid.innerHTML = '';
+
+    // Append sorted items
+    allPagesGrid.appendChild(fragment);
+}

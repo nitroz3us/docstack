@@ -42,13 +42,32 @@ export async function mergePDFs(showLoading, hideLoading) {
                 const file = state.getFile(fileId);
                 if (!file) continue;
 
-                // Load document if not cached
-                if (!docCache[fileId]) {
-                    docCache[fileId] = await PDFDocument.load(file.arrayBuffer);
-                }
-                const srcDoc = docCache[fileId];
+                // WRAPPER LOGIC START: Check for imported page
+                const importedPage = file.importedPages?.find(p => p.newIndex === pageIndex);
+                let srcDoc;
+                let actualPageIndex; // 0-based index for pdf-lib
 
-                const [copiedPage] = await mergedPdf.copyPages(srcDoc, [pageIndex]);
+                if (importedPage) {
+                    const sourceFile = state.getFile(importedPage.sourceFileId);
+                    if (!sourceFile) continue;
+
+                    if (!docCache[importedPage.sourceFileId]) {
+                        docCache[importedPage.sourceFileId] = await PDFDocument.load(sourceFile.arrayBuffer);
+                    }
+                    srcDoc = docCache[importedPage.sourceFileId];
+                    actualPageIndex = importedPage.sourcePageIndex;
+                } else {
+                    // Native page
+                    if (!docCache[fileId]) {
+                        docCache[fileId] = await PDFDocument.load(file.arrayBuffer);
+                    }
+
+                    srcDoc = docCache[fileId];
+                    actualPageIndex = pageIndex;
+                }
+                // WRAPPER LOGIC END
+
+                const [copiedPage] = await mergedPdf.copyPages(srcDoc, [actualPageIndex]);
 
                 // Apply rotation
                 const rotation = file.pageRotations[pageIndex] || 0;

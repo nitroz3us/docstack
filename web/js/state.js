@@ -92,6 +92,19 @@ export function removeFile(fileId) {
 }
 
 /**
+ * Reorder uploaded files
+ * @param {string[]} newFileIds - Array of file IDs in new order
+ */
+export function reorderFiles(newFileIds) {
+    const fileMap = new Map(uploadedFiles.map(f => [f.id, f]));
+    uploadedFiles = newFileIds.map(id => fileMap.get(id)).filter(f => f);
+    // Invalidate/Rebuild cache
+    allPagesRendered = false;
+    globalPageOrder = [];
+    emit('files:reordered', { order: newFileIds });
+}
+
+/**
  * Get a file by ID
  * @param {string} fileId 
  * @returns {Object | undefined}

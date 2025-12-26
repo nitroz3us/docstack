@@ -6,8 +6,9 @@
 
 import * as state from './state.js';
 import { initPdfLib, renderPdfPage } from './utils/pdf.js';
-import { initViews, addFileCard, toggleFileExpand, switchView, renderFileGrid } from './ui/views.js';
+import { initViews, addFileCard, toggleFileExpand, switchView, renderFileGrid, syncPagesViewOrder, updatePageIdentity } from './ui/views.js';
 import { initModals, showHelpModal, showPageLightbox } from './ui/modals.js';
+
 import { initUploadHandler, handleFiles } from './handlers/upload.js';
 import { initMergeHandler, mergePDFs } from './handlers/merge.js';
 
@@ -122,6 +123,12 @@ export async function initApp() {
             handle: '.card-header',
             ghostClass: 'sortable-ghost',
             chosenClass: 'sortable-chosen',
+            onEnd: () => {
+                const newOrder = Array.from(elements.pdfList.querySelectorAll('.pdf-card'))
+                    .map(el => el.dataset.fileId);
+                state.reorderFiles(newOrder);
+                syncPagesViewOrder();
+            }
         });
     }
 
@@ -174,7 +181,26 @@ function hideLoading(elements) {
 }
 
 function handleCrossFileDrag(evt, sourceFileId) {
-    if (evt.from === evt.to) return;
+    // Handle reordering within the same file OR across files (both affect global order)
+    if (evt.from === evt.to) {
+        const file = state.getFile(sourceFileId);
+        if (file) {
+            // Update page order based on new DOM order
+            file.pageOrder = Array.from(evt.from.querySelectorAll('.page-thumb')).map(
+                el => parseInt(el.dataset.pageIndex)
+            );
+            // Sync global Pages view to match
+            syncPagesViewOrder();
+
+            // Update page count on card (just in case)
+            const card = evt.from.closest('.pdf-card');
+            if (card) {
+                const countEl = card.querySelector('.page-count');
+                if (countEl) countEl.textContent = file.pageOrder.length;
+            }
+        }
+        return;
+    }
 
     const sourceCard = evt.from.closest('.pdf-card');
     const targetCard = evt.to.closest('.pdf-card');
@@ -228,8 +254,11 @@ function handleCrossFileDrag(evt, sourceFileId) {
     const targetCount = targetCard.querySelector('.page-count');
     if (targetCount) targetCount.textContent = targetFile.pageOrder.length;
 
-    // Invalidate Pages view (order changed)
-    state.invalidatePagesView();
+    // Update Pages view identity for the moved page
+    updatePageIdentity(sourceFileId, pageIndex, targetFileId, newPageIndex);
+
+    // Sync Pages view (order changed)
+    syncPagesViewOrder();
 }
 
 // ============================================
