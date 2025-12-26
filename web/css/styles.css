@@ -1,0 +1,16 @@
+/* docstack Custom Styles */
+
+/* Drop Zone States */
+.drop-zone.dragover {
+    border-color: #374151;
+    background-color: #f9fafb;
+}
+
+/* Sortable.js States */
+.sortable-ghost {
+    opacity: 0.4;
+}
+
+.sortable-chosen {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
