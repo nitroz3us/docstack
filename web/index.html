@@ -209,6 +209,23 @@
         // pdf-lib is loaded globally as PDFLib
         const { PDFDocument, degrees } = PDFLib;
 
+        /**
+         * docstack Architecture & State Management
+         * 
+         * State:
+         * - uploadedFiles: Array of file objects (Source of Truth)
+         * - globalPageOrder: Array of {fileId, pageIndex} for "All Pages" view
+         * 
+         * View Synchronization:
+         * 1. Files View -> Pages View:
+         *    - Deletions in Files view directly remove elements from Pages view DOM (if rendered).
+         *    - New file uploads invalidate Pages view cache (`allPagesRendered = false`).
+         * 
+         * 2. Pages View -> Files View:
+         *    - Deletions in Pages view directly remove elements from Files view DOM.
+         *    - Drag operations sync with `file.pageOrder` immediately.
+         */
+
         // State - stores file data in memory
         let uploadedFiles = []; // { id, name, size, arrayBuffer, pageCount, rules, pageRotations, pageOrder }
         let currentLightboxState = { fileId: null, orderIndex: 0 };
@@ -424,6 +441,15 @@
                     const file = uploadedFiles.find(f => f.id === fileId);
                     if (file) {
                         file.pageOrder = file.pageOrder.filter(idx => idx !== pageIndex);
+                        
+                        // Also remove from Files view DOM if exists
+                        const fileCard = document.querySelector(`.pdf-card[data-file-id="${fileId}"]`);
+                        if (fileCard) {
+                            const fileThumb = fileCard.querySelector(`.page-thumb[data-page-index="${pageIndex}"]`);
+                            if (fileThumb) {
+                                fileThumb.remove();
+                            }
+                        }
                     }
                 }
             }
@@ -624,6 +650,10 @@
 
                     uploadedFiles.push(fileData);
                     
+                    // Invalidate Pages view cache so new files appear when switching
+                    globalPageOrder = [];
+                    allPagesRendered = false;
+                    
                     // Update UI immediately (show lists, toggle)
                     updateUI();
                     
@@ -788,11 +818,28 @@
                         
                         // Delete page button handler
                         thumb.querySelector('.delete-page-btn').addEventListener('click', (e) => {
+                            e.preventDefault();
                             e.stopPropagation();
+                            
+                            const targetThumb = e.target.closest('.page-thumb');
+                            if (!targetThumb) return;
+                            
                             // Remove from pageOrder
                             file.pageOrder = file.pageOrder.filter(idx => idx !== pageIndex);
+                            
                             // Remove from DOM
-                            thumb.remove();
+                            targetThumb.remove();
+                            
+                            // Surgically update Pages view if it's already rendered
+                            if (allPagesRendered) {
+                                // Find and remove from Pages grid
+                                const pagesThumb = allPagesGrid.querySelector(`.page-thumb[data-file-id="${file.id}"][data-page-index="${pageIndex}"]`);
+                                if (pagesThumb) {
+                                    pagesThumb.remove();
+                                    // Update global order cache
+                                    globalPageOrder = globalPageOrder.filter(item => !(item.fileId === file.id && item.pageIndex === pageIndex));
+                                }
+                            }
                         });
                         
                         // Preview (Lightbox) page button handler
