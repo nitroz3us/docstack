@@ -483,6 +483,8 @@
                     const thumb = document.createElement('div');
                     thumb.className = 'page-thumb relative bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-move';
                     thumb.dataset.globalIndex = i;
+                    thumb.dataset.fileId = fileId;
+                    thumb.dataset.pageIndex = pageIndex;
                     
                     // Color code files for visual grouping
                     const fileIndex = uploadedFiles.findIndex(f => f.id === fileId);
@@ -568,6 +570,50 @@
                 }
             });
             
+            
+            // Delegated Delete Handler for All Pages Grid
+            // Ensure we don't attach multiple listeners if called multiple times
+            if (!allPagesGrid.dataset.hasDeleteListener) {
+                allPagesGrid.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.delete-page-btn');
+                    if (!btn) return;
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const thumb = btn.closest('.page-thumb');
+                    const fileId = thumb.dataset.fileId;
+                    const pageIndex = parseInt(thumb.dataset.pageIndex);
+                    
+                    const file = uploadedFiles.find(f => f.id === fileId);
+                    if (!file) return;
+                    
+                    // Remove from data model
+                    file.pageOrder = file.pageOrder.filter(idx => idx !== pageIndex);
+                    
+                    // Remove from DOM
+                    thumb.remove();
+                    
+                    // Update global order
+                    globalPageOrder = globalPageOrder.filter(item => !(item.fileId === fileId && item.pageIndex === pageIndex));
+                    
+                    // Sync with Files View (remove from expanded grid if visible)
+                    const filesCard = pdfList.querySelector(`[data-file-id="${fileId}"]`);
+                    if (filesCard) {
+                        const filesThumb = filesCard.querySelector(`.pages-grid .page-thumb[data-page-index="${pageIndex}"]`);
+                        if (filesThumb) {
+                            filesThumb.remove();
+                        }
+                        // Update count
+                        const countEl = filesCard.querySelector('.page-count'); // Needs class added to badge
+                        if (countEl) countEl.textContent = file.pageOrder.length; 
+                    }
+                    
+                    updateUI(true);
+                });
+                allPagesGrid.dataset.hasDeleteListener = 'true';
+            }
+
             allPagesRendered = true;
         }
 
@@ -766,7 +812,7 @@
                         <div class="thumbnail-spinner absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
                             <div class="w-5 h-5 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin"></div>
                         </div>
-                        <div class="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full z-20">
+                        <div class="page-count absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full z-20">
                             ${file.pageCount}
                         </div>
                     </div>
