@@ -783,16 +783,36 @@
                         renderPdfPage(file.arrayBuffer, pageNum, canvas, 0.3);
                     }
                     
-                    // Initialize sortable for pages
+                    // Initialize sortable for pages (with cross-file dragging)
                     new Sortable(grid, {
                         animation: 150,
+                        group: 'shared-pages',
                         ghostClass: 'sortable-ghost',
                         chosenClass: 'sortable-chosen',
-                        onEnd: () => {
-                            // Update pageOrder based on new DOM order
-                            file.pageOrder = Array.from(grid.querySelectorAll('.page-thumb')).map(
-                                el => parseInt(el.dataset.pageIndex)
-                            );
+                        onEnd: (evt) => {
+                            // Handle cross-file page move
+                            if (evt.from !== evt.to) {
+                                const sourceCard = evt.from.closest('.pdf-card');
+                                const targetCard = evt.to.closest('.pdf-card');
+                                if (sourceCard && targetCard) {
+                                    const sourceFileId = sourceCard.dataset.fileId;
+                                    const targetFileId = targetCard.dataset.fileId;
+                                    const pageIndex = parseInt(evt.item.dataset.pageIndex);
+                                    handleCrossFileDrag(sourceFileId, targetFileId, pageIndex, evt.item);
+                                }
+                            }
+                            
+                            // Update pageOrder based on new DOM order for target grid
+                            const targetCard = evt.to.closest('.pdf-card');
+                            if (targetCard) {
+                                const targetFileId = targetCard.dataset.fileId;
+                                const targetFile = uploadedFiles.find(f => f.id === targetFileId);
+                                if (targetFile) {
+                                    targetFile.pageOrder = Array.from(evt.to.querySelectorAll('.page-thumb')).map(
+                                        el => parseInt(el.dataset.pageIndex)
+                                    );
+                                }
+                            }
                         }
                     });
                 }
@@ -811,6 +831,41 @@
             const card = pdfList.querySelector(`[data-file-id="${fileId}"]`);
             if (card) card.remove();
             updateUI();
+        }
+
+        // Handle cross-file page drag
+        function handleCrossFileDrag(sourceFileId, targetFileId, pageIndex, thumbElement) {
+            const sourceFile = uploadedFiles.find(f => f.id === sourceFileId);
+            const targetFile = uploadedFiles.find(f => f.id === targetFileId);
+            if (!sourceFile || !targetFile) return;
+
+            // Get rotation data from source
+            const rotation = sourceFile.pageRotations[pageIndex] || 0;
+            
+            // Create new page index for target file
+            const newPageIndex = targetFile.pageCount;
+            targetFile.pageCount++;
+            
+            // Initialize importedPages array if needed
+            if (!targetFile.importedPages) targetFile.importedPages = [];
+            
+            // Store reference to source page data
+            targetFile.importedPages.push({
+                newIndex: newPageIndex,
+                sourceFileId: sourceFileId,
+                sourcePageIndex: pageIndex
+            });
+            
+            // Copy rotation to target
+            targetFile.pageRotations[newPageIndex] = rotation;
+            
+            // Update thumb element's data attributes
+            thumbElement.dataset.pageIndex = newPageIndex;
+            thumbElement.dataset.sourceFileId = sourceFileId;
+            thumbElement.dataset.sourcePageIndex = pageIndex;
+            
+            // Remove from source pageOrder
+            sourceFile.pageOrder = sourceFile.pageOrder.filter(idx => idx !== pageIndex);
         }
 
         // Merge PDFs using pdf-lib
@@ -849,10 +904,10 @@
                         mergedPdf.addPage(copiedPage);
                     }
                 } else {
-                    // Original "By File" mode logic
+                    // Original "Files" mode logic (with cross-file drag support)
+                    const docCache = {};
+                    
                     for (const file of uploadedFiles) {
-                        const srcDoc = await PDFDocument.load(file.arrayBuffer);
-                        
                         // Use text rules if provided, otherwise use pageOrder (drag-and-drop order)
                         let pagesToProcess;
                         if (file.rules.trim()) {
@@ -866,7 +921,32 @@
                         }
 
                         for (const rule of pagesToProcess) {
-                            const [copiedPage] = await mergedPdf.copyPages(srcDoc, [rule.page]);
+                            // Check if this is an imported page from another file
+                            const importedPage = file.importedPages?.find(p => p.newIndex === rule.page);
+                            
+                            let srcDoc;
+                            let actualPageIndex;
+                            
+                            if (importedPage) {
+                                // Load from source file
+                                const sourceFile = uploadedFiles.find(f => f.id === importedPage.sourceFileId);
+                                if (!sourceFile) continue;
+                                
+                                if (!docCache[importedPage.sourceFileId]) {
+                                    docCache[importedPage.sourceFileId] = await PDFDocument.load(sourceFile.arrayBuffer);
+                                }
+                                srcDoc = docCache[importedPage.sourceFileId];
+                                actualPageIndex = importedPage.sourcePageIndex;
+                            } else {
+                                // Load from current file
+                                if (!docCache[file.id]) {
+                                    docCache[file.id] = await PDFDocument.load(file.arrayBuffer);
+                                }
+                                srcDoc = docCache[file.id];
+                                actualPageIndex = rule.page;
+                            }
+                            
+                            const [copiedPage] = await mergedPdf.copyPages(srcDoc, [actualPageIndex]);
                             
                             // Combine text-based rotation with visual rotation
                             const visualRotation = file.pageRotations[rule.page] || 0;
