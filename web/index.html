@@ -400,6 +400,35 @@
             }
         }
 
+        // Event delegation for All Pages view (Delete page)
+        allPagesGrid.addEventListener('click', (e) => {
+            const deleteBtn = e.target.closest('.delete-page-btn');
+            if (deleteBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const thumb = deleteBtn.closest('.page-thumb');
+                if (thumb) {
+                    const fileId = thumb.dataset.fileId;
+                    const pageIndex = parseInt(thumb.dataset.pageIndex);
+                    
+                    thumb.remove();
+                    
+                    // Update globalPageOrder from current DOM state
+                    globalPageOrder = Array.from(allPagesGrid.querySelectorAll('.page-thumb')).map(el => ({
+                        fileId: el.dataset.fileId,
+                        pageIndex: parseInt(el.dataset.pageIndex)
+                    }));
+                    
+                    // Sync with source file model
+                    const file = uploadedFiles.find(f => f.id === fileId);
+                    if (file) {
+                        file.pageOrder = file.pageOrder.filter(idx => idx !== pageIndex);
+                    }
+                }
+            }
+        });
+
         // Render all pages from all files in a single grid
         async function renderAllPagesView() {
             allPagesGrid.innerHTML = '';
@@ -467,12 +496,7 @@
                     thumb.querySelector('.canvas-wrapper').style.transform = `rotate(${file.pageRotations[pageIndex]}deg)`;
                 });
 
-                thumb.querySelector('.delete-page-btn').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    globalPageOrder.splice(i, 1);
-                    renderAllPagesView();
-                    updateUI();
-                });
+                // Delete handler is managed via event delegation on allPagesGrid
 
                 thumb.querySelector('.preview-page-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -497,6 +521,8 @@
                         fileId: el.dataset.fileId,
                         pageIndex: parseInt(el.dataset.pageIndex)
                     }));
+                    
+                    updateUI(true);
                 }
             });
             
@@ -987,25 +1013,29 @@
         }
 
         // UI Helpers
-        function updateUI() {
-            // Reset cache flags when files change (will rebuild on next render)
-            globalPageOrder = [];
-            allPagesRendered = false;
-            
+        function updateUI(skipRender = false) {
             if (uploadedFiles.length === 0) {
-                emptyState.classList.remove('hidden');
-                mergeSection.classList.add('hidden');
-                viewToggle.classList.add('hidden');
-                pdfList.classList.remove('hidden');
-                allPagesView.classList.add('hidden');
                 currentView = 'byFile';
+                switchView('byFile'); // Reset view state
+                
+                pdfList.innerHTML = '';
+                allPagesGrid.innerHTML = '';
+                
+                pdfList.classList.add('hidden');
+                allPagesView.classList.add('hidden');
+                viewToggle.classList.add('hidden');
+                mergeSection.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                
+                globalPageOrder = [];
+                allPagesRendered = false;
             } else {
                 emptyState.classList.add('hidden');
                 mergeSection.classList.remove('hidden');
                 viewToggle.classList.remove('hidden');
                 
-                // Re-render all pages view if it's active (files changed)
-                if (currentView === 'allPages') {
+                // Re-render all pages view if it's active (files changed), unless skipped
+                if (currentView === 'allPages' && !skipRender) {
                     renderAllPagesView();
                 }
             }
