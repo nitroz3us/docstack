@@ -380,7 +380,7 @@
             }
             
             // Render at higher resolution for lightbox
-            await renderPdfPage(file.arrayBuffer, pageNum, lightboxCanvas, 1.5);
+            await renderPdfPage(file.pdfProxy, pageNum, lightboxCanvas, 1.5);
             
             // Apply rotation via CSS
             lightboxCanvas.style.transform = rotation ? `rotate(${rotation}deg)` : '';
@@ -467,53 +467,59 @@
                     }
                 }
             }
+            // Render batches of pages to avoid blocking UI
+            let currentIndex = 0;
+            const batchSize = 50;
 
-            // Render each page
-            for (let i = 0; i < globalPageOrder.length; i++) {
-                const { fileId, pageIndex } = globalPageOrder[i];
-                const file = uploadedFiles.find(f => f.id === fileId);
-                if (!file) continue;
-
-                const pageNum = pageIndex + 1;
-                const thumb = document.createElement('div');
-                thumb.className = 'page-thumb relative bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-move';
-                thumb.dataset.globalIndex = i;
-                thumb.dataset.fileId = fileId;
-                thumb.dataset.pageIndex = pageIndex;
+            function renderBatch() {
+                const limit = Math.min(currentIndex + batchSize, globalPageOrder.length);
                 
-                // Color code by file (dynamic hue)
-                const fileIndex = uploadedFiles.indexOf(file);
-                // Start at Blue (210deg) instead of Red (0deg)
-                const hue = ((fileIndex * 137.508) + 210) % 360; 
-                const colorStyle = `border-left-color: hsl(${hue}, 70%, 50%);`;
-                
-                thumb.innerHTML = `
-                    <div class="canvas-wrapper aspect-[3/4] bg-gray-100 border-l-4 relative" style="${colorStyle} transform: rotate(${file.pageRotations[pageIndex]}deg)">
-                        <canvas class="w-full h-full"></canvas>
-                    </div>
-                    <div class="absolute top-1 right-1 flex gap-1">
-                        <button class="preview-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-blue-50 hover:shadow" title="Preview">
-                            <svg class="w-4 h-4 text-gray-500 hover:text-blue-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                        </button>
-                        <button class="rotate-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-100 hover:shadow" title="Rotate 90°">
-                            <svg class="w-4 h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                        </button>
-                        <button class="delete-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-red-50 hover:shadow" title="Delete page">
-                            <svg class="w-4 h-4 text-gray-500 hover:text-red-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="flex items-center justify-between text-[10px] text-gray-500 py-1 px-1.5 bg-white">
-                        <span class="truncate" title="${file.name}">${file.name.slice(0, 10)}${file.name.length > 10 ? '...' : ''}</span>
-                        <span>p${pageNum}</span>
-                    </div>
-                `;
+                for (let i = currentIndex; i < limit; i++) {
+                    const { fileId, pageIndex } = globalPageOrder[i];
+                    const file = uploadedFiles.find(f => f.id === fileId);
+                    if (!file) continue;
+    
+                    const pageNum = pageIndex + 1;
+                    const thumb = document.createElement('div');
+                    thumb.className = 'page-thumb relative bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-move';
+                    thumb.dataset.globalIndex = i;
+                    
+                    // Color code files for visual grouping
+                    const fileIndex = uploadedFiles.findIndex(f => f.id === fileId);
+                    // Start at Blue (210deg) instead of Red (0deg), use golden angle approx (137.5 deg) for distribution
+                    const hue = ((fileIndex * 137.508) + 210) % 360; 
+                    const colorStyle = `border-left-color: hsl(${hue}, 70%, 50%);`;
+    
+                    thumb.innerHTML = `
+                        <div class="canvas-wrapper aspect-[3/4] bg-gray-100 border-l-4 relative" style="${colorStyle} transform: rotate(${file.pageRotations[pageIndex]}deg)">
+                            <canvas class="w-full h-full"></canvas>
+                            <div class="thumbnail-spinner absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+                                <div class="w-6 h-6 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin"></div>
+                            </div>
+                        </div>
+                        <div class="absolute top-1 right-1 flex gap-1">
+                            <button class="preview-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-blue-50 hover:shadow" title="Preview">
+                                <svg class="w-4 h-4 text-gray-500 hover:text-blue-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </button>
+                            <button class="rotate-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-100 hover:shadow" title="Rotate 90°">
+                                <svg class="w-4 h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                            <button class="delete-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-red-50 hover:shadow" title="Delete page">
+                                <svg class="w-4 h-4 text-gray-500 hover:text-red-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] text-gray-500 py-1 px-1.5 bg-white border-t border-gray-50">
+                            <span class="font-medium truncate max-w-[80px]" title="${file.name}">${file.name}</span>
+                            <span>p.${pageNum}</span>
+                        </div>
+                    `;
 
                 // Event handlers
                 thumb.querySelector('.rotate-btn').addEventListener('click', (e) => {
@@ -533,10 +539,20 @@
                 
                 // Render thumbnail
                 const canvas = thumb.querySelector('canvas');
-                renderPdfPage(file.arrayBuffer, pageNum, canvas, 0.3);
+                const spinner = thumb.querySelector('.thumbnail-spinner');
+                renderPdfPage(file.pdfProxy, pageNum, canvas, 0.3).finally(() => spinner?.remove());
             }
 
-            // Initialize sortable for all pages grid
+            currentIndex += batchSize;
+            if (currentIndex < globalPageOrder.length) {
+                requestAnimationFrame(renderBatch);
+            }
+        }
+
+        // Start rendering first batch
+        renderBatch();
+
+        // Initialize sortable for all pages grid
             new Sortable(allPagesGrid, {
                 animation: 150,
                 ghostClass: 'sortable-ghost',
@@ -605,11 +621,11 @@
             return results;
         }
 
-        // Render PDF page to canvas using PDF.js
-        async function renderPdfPage(arrayBuffer, pageNum, canvas, scale = 0.5) {
+        // Render PDF page to canvas using cached PDF.js proxy
+        async function renderPdfPage(pdfDoc, pageNum, canvas, scale = 0.5) {
             try {
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
-                const page = await pdf.getPage(pageNum);
+                // PDF.js pages are 1-indexed
+                const page = await pdfDoc.getPage(pageNum);
                 
                 const viewport = page.getViewport({ scale });
                 canvas.width = viewport.width;
@@ -625,23 +641,65 @@
             }
         }
 
+        // Create a loading skeleton card
+        function createLoadingCard(fileName) {
+            const card = document.createElement('div');
+            card.className = 'pdf-card bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4 animate-pulse';
+            card.innerHTML = `
+                <div class="w-16 h-20 bg-gray-200 rounded-lg flex-shrink-0"></div>
+                <div class="flex-1 min-w-0">
+                    <p class="h-4 bg-gray-200 rounded w-3/4 mb-2"></p>
+                    <p class="h-3 bg-gray-200 rounded w-1/2"></p>
+                </div>
+                <div class="w-5 h-5 bg-gray-200 rounded-full"></div>
+            `;
+            return card;
+        }
+
         // Handle file uploads
         async function handleFiles(e) {
             const files = Array.from(e.target.files).filter(f => f.type === 'application/pdf');
             if (files.length === 0) return;
 
+            // Ensure UI is visible
+            emptyState.classList.add('hidden');
+            mergeSection.classList.remove('hidden');
+            viewToggle.classList.remove('hidden');
+            
+            // Only show list if on Files view
+            if (currentView === 'byFile') {
+                pdfList.classList.remove('hidden');
+            }
 
             for (const file of files) {
+                // Remove empty state if it's the first file (redundant check but safe)
+                if (uploadedFiles.length === 0) emptyState.classList.add('hidden');
+
+                const loadingCard = createLoadingCard(file.name);
+                pdfList.appendChild(loadingCard);
+                
+                // Scroll to new card
+                loadingCard.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
                 try {
+                    // Small delay to allow UI to update (rendering blocking mitigation)
+                    await new Promise(r => requestAnimationFrame(r));
+
                     const arrayBuffer = await file.arrayBuffer();
-                    const pdfDoc = await PDFDocument.load(arrayBuffer);
-                    const pageCount = pdfDoc.getPageCount();
+                    
+                    // Load for rendering (PDF.js) - CACHED PROXY
+                    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
+                    const pdfProxy = await loadingTask.promise;
+                    
+                    // Optimization: Get pageCount directly from pdfProxy instead of re-parsing with pdf-lib
+                    const pageCount = pdfProxy.numPages;
 
                     const fileData = {
                         id: crypto.randomUUID(),
                         name: file.name,
                         size: file.size, // File size in bytes
                         arrayBuffer: arrayBuffer,
+                        pdfProxy: pdfProxy, // Cache for rendering
                         pageCount: pageCount,
                         rules: '',
                         pageRotations: Array(pageCount).fill(0), // Track rotation per page (0, 90, 180, 270)
@@ -654,16 +712,42 @@
                     globalPageOrder = [];
                     allPagesRendered = false;
                     
-                    // Update UI immediately (show lists, toggle)
+                    // Remove loading card before adding real one
+                    loadingCard.remove();
+                    
+                    // Update UI (counters, etc)
                     updateUI();
                     
                     // Render card (includes async thumbnail)
                     await addPdfCard(fileData);
                 } catch (error) {
                     console.error('Error loading PDF:', error);
+                    loadingCard.remove();
                     alert(`Failed to load ${file.name}: ${error.message}`);
                 }
             }
+            
+            // Background Render: Pre-calculate the "All Pages" view so switching is instant
+            // We use a timeout to let the primary "Files" view rendering finish first (prioritize user focus)
+            setTimeout(() => {
+                // Background Render: Trigger batched rendering for expanded file views
+                uploadedFiles.forEach(file => {
+                    const card = pdfList.querySelector(`[data-file-id="${file.id}"]`);
+                    if (card) {
+                        const grid = card.querySelector('.pages-grid');
+                        // Helper to render if grid exists and is empty
+                        if (grid && grid.children.length === 0) {
+                            renderFileGrid(file, grid);
+                        }
+                    }
+                });
+
+                // Background Render: Pre-calculate the "All Pages" view
+                renderAllPagesView().then(() => {
+                    allPagesRendered = true;
+                    console.log('Background rendering of Pages view complete');
+                });
+            }, 1000);
             
             fileInput.value = '';
         }
@@ -679,7 +763,10 @@
                 <div class="card-header flex items-center gap-4 p-4 cursor-pointer">
                     <div class="relative w-16 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <canvas class="pdf-preview w-full h-full object-cover"></canvas>
-                        <div class="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                        <div class="thumbnail-spinner absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+                            <div class="w-5 h-5 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin"></div>
+                        </div>
+                        <div class="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full z-20">
                             ${file.pageCount}
                         </div>
                     </div>
@@ -745,7 +832,8 @@
 
             // Render first page preview
             const canvas = card.querySelector('.pdf-preview');
-            await renderPdfPage(file.arrayBuffer, 1, canvas, 0.4);
+            const spinner = card.querySelector('.thumbnail-spinner');
+            renderPdfPage(file.pdfProxy, 1, canvas, 0.4).finally(() => spinner?.remove());
         }
         
         // Toggle card expansion
@@ -770,126 +858,153 @@
                 
                 // Only render pages if not already rendered
                 if (grid.children.length === 0) {
-                    // Render pages in current order
-                    for (const pageIndex of file.pageOrder) {
-                        const pageNum = pageIndex + 1;
-                        const thumb = document.createElement('div');
-                        thumb.className = 'page-thumb relative bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm group cursor-move';
-                        thumb.dataset.pageIndex = pageIndex;
-                        thumb.innerHTML = `
-                            <div class="canvas-wrapper aspect-[3/4] bg-gray-100" style="transform: rotate(${file.pageRotations[pageIndex]}deg)">
-                                <canvas class="w-full h-full"></canvas>
-                            </div>
-                            <div class="absolute top-1 right-1 flex gap-1">
-                                <button class="preview-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-blue-50 hover:shadow" title="Preview">
-                                    <svg class="w-4 h-4 text-gray-500 hover:text-blue-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                </button>
-                                <button class="rotate-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-100 hover:shadow" title="Rotate 90°">
-                                    <svg class="w-4 h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                </button>
-                                <button class="delete-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-red-50 hover:shadow" title="Delete page">
-                                    <svg class="w-4 h-4 text-gray-500 hover:text-red-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <div class="flex items-center justify-between text-[10px] text-gray-500 py-1 px-1.5 bg-white">
-                                <span class="page-num">${pageNum}</span>
-                                <span class="rotation-label text-gray-400">${file.pageRotations[pageIndex] > 0 ? file.pageRotations[pageIndex] + '°' : ''}</span>
-                            </div>
-                        `;
-                        
-                        // Rotate button handler
-                        thumb.querySelector('.rotate-btn').addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            file.pageRotations[pageIndex] = (file.pageRotations[pageIndex] + 90) % 360;
-                            
-                            const wrapper = thumb.querySelector('.canvas-wrapper');
-                            wrapper.style.transform = `rotate(${file.pageRotations[pageIndex]}deg)`;
-                            
-                            const label = thumb.querySelector('.rotation-label');
-                            label.textContent = file.pageRotations[pageIndex] > 0 ? file.pageRotations[pageIndex] + '°' : '';
-                        });
-                        
-                        // Delete page button handler
-                        thumb.querySelector('.delete-page-btn').addEventListener('click', (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            
-                            const targetThumb = e.target.closest('.page-thumb');
-                            if (!targetThumb) return;
-                            
-                            // Remove from pageOrder
-                            file.pageOrder = file.pageOrder.filter(idx => idx !== pageIndex);
-                            
-                            // Remove from DOM
-                            targetThumb.remove();
-                            
-                            // Surgically update Pages view if it's already rendered
-                            if (allPagesRendered) {
-                                // Find and remove from Pages grid
-                                const pagesThumb = allPagesGrid.querySelector(`.page-thumb[data-file-id="${file.id}"][data-page-index="${pageIndex}"]`);
-                                if (pagesThumb) {
-                                    pagesThumb.remove();
-                                    // Update global order cache
-                                    globalPageOrder = globalPageOrder.filter(item => !(item.fileId === file.id && item.pageIndex === pageIndex));
-                                }
-                            }
-                        });
-                        
-                        // Preview (Lightbox) page button handler
-                        thumb.querySelector('.preview-page-btn').addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            // Find current index in pageOrder (handling reordering)
-                            const currentOrderIndex = file.pageOrder.indexOf(pageIndex);
-                            showPageLightbox(file.id, currentOrderIndex);
-                        });
-                        
-                        grid.appendChild(thumb);
-                        
-                        const canvas = thumb.querySelector('canvas');
-                        renderPdfPage(file.arrayBuffer, pageNum, canvas, 0.3);
-                    }
-                    
-                    // Initialize sortable for pages (with cross-file dragging)
-                    new Sortable(grid, {
-                        animation: 150,
-                        group: 'shared-pages',
-                        ghostClass: 'sortable-ghost',
-                        chosenClass: 'sortable-chosen',
-                        onEnd: (evt) => {
-                            // Handle cross-file page move
-                            if (evt.from !== evt.to) {
-                                const sourceCard = evt.from.closest('.pdf-card');
-                                const targetCard = evt.to.closest('.pdf-card');
-                                if (sourceCard && targetCard) {
-                                    const sourceFileId = sourceCard.dataset.fileId;
-                                    const targetFileId = targetCard.dataset.fileId;
-                                    const pageIndex = parseInt(evt.item.dataset.pageIndex);
-                                    handleCrossFileDrag(sourceFileId, targetFileId, pageIndex, evt.item);
-                                }
-                            }
-                            
-                            // Update pageOrder based on new DOM order for target grid
-                            const targetCard = evt.to.closest('.pdf-card');
-                            if (targetCard) {
-                                const targetFileId = targetCard.dataset.fileId;
-                                const targetFile = uploadedFiles.find(f => f.id === targetFileId);
-                                if (targetFile) {
-                                    targetFile.pageOrder = Array.from(evt.to.querySelectorAll('.page-thumb')).map(
-                                        el => parseInt(el.dataset.pageIndex)
-                                    );
-                                }
-                            }
-                        }
-                    });
+                    renderFileGrid(file, grid);
                 }
             }
+        }
+
+        // Render pages for a specific file grid (batched)
+        function renderFileGrid(file, grid) {
+            let currentIndex = 0;
+            const batchSize = 50;
+
+            function renderBatch() {
+                const limit = Math.min(currentIndex + batchSize, file.pageOrder.length);
+                
+                for (let i = currentIndex; i < limit; i++) {
+                    const pageIndex = file.pageOrder[i];
+                    const pageNum = pageIndex + 1;
+                    const thumb = document.createElement('div');
+                    thumb.className = 'page-thumb relative bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm group cursor-move';
+                    thumb.dataset.pageIndex = pageIndex;
+                    thumb.innerHTML = `
+                        <div class="canvas-wrapper aspect-[3/4] bg-gray-100" style="transform: rotate(${file.pageRotations[pageIndex]}deg)">
+                            <canvas class="w-full h-full"></canvas>
+                            <div class="thumbnail-spinner absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+                                <div class="w-6 h-6 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin"></div>
+                            </div>
+                        </div>
+                        <div class="absolute top-1 right-1 flex gap-1">
+                            <button class="preview-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-blue-50 hover:shadow" title="Preview">
+                                <svg class="w-4 h-4 text-gray-500 hover:text-blue-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </button>
+                            <button class="rotate-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-100 hover:shadow" title="Rotate 90°">
+                                <svg class="w-4 h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                            <button class="delete-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-red-50 hover:shadow" title="Delete page">
+                                <svg class="w-4 h-4 text-gray-500 hover:text-red-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] text-gray-500 py-1 px-1.5 bg-white">
+                            <span class="page-num">${pageNum}</span>
+                            <span class="rotation-label text-gray-400">${file.pageRotations[pageIndex] > 0 ? file.pageRotations[pageIndex] + '°' : ''}</span>
+                        </div>
+                    `;
+                    
+                    // Rotate button handler
+                    thumb.querySelector('.rotate-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        file.pageRotations[pageIndex] = (file.pageRotations[pageIndex] + 90) % 360;
+                        
+                        const wrapper = thumb.querySelector('.canvas-wrapper');
+                        wrapper.style.transform = `rotate(${file.pageRotations[pageIndex]}deg)`;
+                        
+                        const label = thumb.querySelector('.rotation-label');
+                        label.textContent = file.pageRotations[pageIndex] > 0 ? file.pageRotations[pageIndex] + '°' : '';
+
+                        // Update Pages view if it exists
+                        const pagesThumb = document.querySelector(`.page-thumb[data-file-id="${file.id}"][data-page-index="${pageIndex}"]`);
+                        if (pagesThumb) {
+                             const wrapper = pagesThumb.querySelector('.canvas-wrapper');
+                             wrapper.style.transform = `rotate(${file.pageRotations[pageIndex]}deg)`;
+                        }
+                    });
+                    
+                    // Delete page button handler
+                    thumb.querySelector('.delete-page-btn').addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Remove from data model
+                        file.pageOrder = file.pageOrder.filter(p => p !== pageIndex);
+                        
+                        // Update global order
+                        globalPageOrder = globalPageOrder.filter(item => !(item.fileId === file.id && item.pageIndex === pageIndex));
+                        
+                        // Remove from DOM
+                        thumb.remove();
+                        
+                        // Update page count in UI
+                        const card = grid.closest('.pdf-card');
+                        const countEl = card.querySelector('.page-count');
+                        if (countEl) countEl.textContent = file.pageOrder.length; 
+                        
+                        // Sync with Pages view
+                         const pagesThumb = document.querySelector(`.page-thumb[data-file-id="${file.id}"][data-page-index="${pageIndex}"]`);
+                        if (pagesThumb) {
+                            pagesThumb.remove();
+                        }
+                    });
+
+                    // Preview handler
+                    thumb.querySelector('.preview-page-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        showPageLightbox(file.id, file.pageOrder.indexOf(pageIndex));
+                    });
+
+                    grid.appendChild(thumb);
+                    
+                    const canvas = thumb.querySelector('canvas');
+                    const spinner = thumb.querySelector('.thumbnail-spinner');
+                    renderPdfPage(file.pdfProxy, pageNum, canvas, 0.3).finally(() => spinner?.remove());
+                }
+
+                currentIndex += batchSize;
+                if (currentIndex < file.pageOrder.length) {
+                    requestAnimationFrame(renderBatch);
+                }
+            }
+
+            renderBatch();
+            
+            // Initialize sortable for pages (with cross-file dragging)
+             new Sortable(grid, {
+                group: 'shared-pages',
+                animation: 150,
+                filter: 'button, .preview-page-btn, .rotate-btn, .delete-page-btn',
+                onEnd: (evt) => {
+                   // Handle cross-file page move
+                   if (evt.from !== evt.to) {
+                        const sourceCard = evt.from.closest('.pdf-card');
+                        const targetCard = evt.to.closest('.pdf-card');
+                        if (sourceCard && targetCard) {
+                            const sourceFileId = sourceCard.dataset.fileId;
+                            const targetFileId = targetCard.dataset.fileId;
+                            const pageIndex = parseInt(evt.item.dataset.pageIndex);
+                            handleCrossFileDrag(sourceFileId, targetFileId, pageIndex, evt.item);
+                        }
+                   }
+                   
+                   // Update pageOrder based on new DOM order for target grid
+                   const targetCard = evt.to.closest('.pdf-card');
+                   if (targetCard) {
+                       const targetFileId = targetCard.dataset.fileId;
+                       const targetFile = uploadedFiles.find(f => f.id === targetFileId);
+                       if (targetFile) {
+                           targetFile.pageOrder = Array.from(evt.to.querySelectorAll('.page-thumb')).map(
+                               el => parseInt(el.dataset.pageIndex)
+                           );
+                       }
+                   }
+                }
+            });
         }
 
         // Update page rules for a file
