@@ -132,6 +132,18 @@ export async function initApp() {
         });
     }
 
+    // Auto-expand cards when Pages view rendering completes
+    window.addEventListener('pages:renderComplete', () => {
+        const collapsedCards = elements.pdfList.querySelectorAll('.pdf-card');
+        collapsedCards.forEach(card => {
+            const panel = card.querySelector('.pages-panel');
+            if (panel && panel.classList.contains('hidden')) {
+                const fileId = card.dataset.fileId;
+                toggleFileExpand(fileId, card, handlers);
+            }
+        });
+    });
+
     console.log('docstack initialized successfully!');
 }
 

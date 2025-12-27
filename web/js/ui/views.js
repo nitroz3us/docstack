@@ -7,6 +7,7 @@
 import * as state from '../state.js';
 import { createPageThumb, createFileCard } from './components.js';
 import { renderPdfPage } from '../utils/pdf.js';
+import { getFileHue } from '../utils/helpers.js';
 
 // DOM element references (set during initialization)
 let pdfList = null;
@@ -317,8 +318,8 @@ function setupFilesViewDeleteHandler(grid, file, handlers) {
 
 
 /**
- * Prepare Pages view DOM in background (without rendering)
- * Appends new file's pages without clearing existing ones (additive approach)
+ * Prepare Pages view DOM and start progressive rendering
+ * Creates DOM elements on-demand (not upfront) to eliminate initial delay
  * @param {Object} handlers - Event handlers
  */
 export function preparePagesViewDom(handlers) {
@@ -338,83 +339,257 @@ export function preparePagesViewDom(handlers) {
 
     if (newPages.length === 0) return; // Nothing new to add
 
-    // Update global totals
-    totalToRender += newPages.length;
+    // Initialize Sortable if not already (before adding elements)
+    if (window.Sortable && !allPagesGrid.dataset.sortableInit) {
+        new Sortable(allPagesGrid, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            filter: 'button, .preview-page-btn, .rotate-btn, .delete-page-btn',
+            onEnd: () => {
+                const newOrder = Array.from(allPagesGrid.querySelectorAll('.page-thumb')).map(el => ({
+                    fileId: el.dataset.fileId,
+                    pageIndex: parseInt(el.dataset.pageIndex)
+                }));
+                state.setGlobalPageOrder(newOrder);
+            }
+        });
+        allPagesGrid.dataset.sortableInit = 'true';
+    }
+    setupPagesViewDeleteHandler(handlers);
+    startProgressiveRendering(newPages, handlers);
+}
 
-    // Create DOM elements for new pages only
-    let currentIndex = 0;
-    const batchSize = 100;
-
-    function createBatch() {
-        const limit = Math.min(currentIndex + batchSize, newPages.length);
-
-        for (let i = currentIndex; i < limit; i++) {
-            const { fileId, pageIndex } = newPages[i];
-            const file = state.getFile(fileId);
-            if (!file) continue;
-
-            const thumb = createPageThumb({
-                file,
-                pageIndex,
-                view: 'pages',
-                globalIndex: state.globalPageOrder.findIndex(
-                    p => p.fileId === fileId && p.pageIndex === pageIndex
-                ),
-                onPreview: handlers.onPreview,
-                onRotate: (f, pi, el) => {
-                    f.pageRotations[pi] = (f.pageRotations[pi] + 90) % 360;
-                    el.querySelector('.canvas-wrapper').style.transform = `rotate(${f.pageRotations[pi]}deg)`;
-
-                    const filesCard = pdfList.querySelector(`[data-file-id="${f.id}"]`);
-                    if (filesCard) {
-                        const filesThumb = filesCard.querySelector(`.page-thumb[data-page-index="${pi}"]`);
-                        if (filesThumb) {
-                            const wrapper = filesThumb.querySelector('.canvas-wrapper');
-                            wrapper.style.transform = `rotate(${f.pageRotations[pi]}deg)`;
-                            const label = filesThumb.querySelector('.rotation-label');
-                            if (label) label.textContent = f.pageRotations[pi] > 0 ? f.pageRotations[pi] + '°' : '';
-                        }
-                    }
-                    state.emit('page:rotated', { fileId: f.id, pageIndex: pi, rotation: f.pageRotations[pi] });
-                }
-            });
-
+/**
+ * Progressive rendering: creates DOM element and renders thumbnail in one loop
+ * Eliminates upfront DOM creation delay
+ */
+function startProgressiveRendering(pagesToRender, handlers) {
+    if (isRendering) {
+        totalToRender += pagesToRender.length;
+        updateProgressTotal();
+        pagesToRender.forEach((item, idx) => {
+            const file = state.getFile(item.fileId);
+            if (!file) return;
+            const thumb = createProgressiveThumb(file, item.pageIndex, handlers, idx);
             allPagesGrid.appendChild(thumb);
-        }
+        });
+        return;
+    }
 
-        currentIndex += batchSize;
-        if (currentIndex < newPages.length) {
-            requestAnimationFrame(createBatch);
-        } else {
-            // DOM is ready for new pages, setup Sortable and delete handlers
-            if (window.Sortable && !allPagesGrid.dataset.sortableInit) {
-                new Sortable(allPagesGrid, {
-                    animation: 150,
-                    ghostClass: 'sortable-ghost',
-                    chosenClass: 'sortable-chosen',
-                    filter: 'button, .preview-page-btn, .rotate-btn, .delete-page-btn',
-                    onEnd: () => {
-                        const newOrder = Array.from(allPagesGrid.querySelectorAll('.page-thumb')).map(el => ({
-                            fileId: el.dataset.fileId,
-                            pageIndex: parseInt(el.dataset.pageIndex)
-                        }));
-                        state.setGlobalPageOrder(newOrder);
-                    }
-                });
-                allPagesGrid.dataset.sortableInit = 'true';
-            }
-            setupPagesViewDeleteHandler(handlers);
+    isRendering = true;
+    totalToRender = pagesToRender.length;
+    renderedCount = 0;
 
-            // Start rendering if not already in progress, otherwise it will pick up new pages
-            if (!isRendering) {
-                preRenderPagesViewThumbnails();
-            }
-            // If already rendering, update progress bar total
-            updateProgressTotal();
+    // Get progress bar elements
+    const progressContainer = document.getElementById('renderProgress');
+    const progressText = document.getElementById('renderProgressText');
+    const progressPercent = document.getElementById('renderProgressPercent');
+    const progressBar = document.getElementById('renderProgressBar');
+    const progressHint = document.getElementById('renderProgressHint');
+
+    if (progressContainer) {
+        progressContainer.classList.remove('hidden');
+        progressText.textContent = `Preparing pages: 0/${totalToRender}`;
+        progressPercent.textContent = '0%';
+        progressBar.style.width = '0%';
+        progressBar.classList.remove('bg-green-500');
+        progressBar.classList.add('bg-blue-500');
+
+        if (progressHint && totalToRender >= 50) {
+            progressHint.classList.remove('hidden');
+            progressHint.textContent = '☕ Whoa, big file! Sit tight while we prepare your pages...';
         }
     }
 
-    createBatch();
+    updateMergeButton(true);
+
+    let currentIndex = 0;
+
+    function updateProgress() {
+        if (!progressContainer) return;
+        const percent = Math.round((renderedCount / totalToRender) * 100);
+        progressText.textContent = `Preparing pages: ${renderedCount}/${totalToRender}`;
+        progressPercent.textContent = `${percent}%`;
+        progressBar.style.width = `${percent}%`;
+    }
+
+    function completeProgress() {
+        isRendering = false;
+        if (!progressContainer) return;
+        progressText.textContent = 'All pages ready!';
+        progressPercent.textContent = '100%';
+        progressBar.style.width = '100%';
+        progressBar.classList.remove('bg-blue-500');
+        progressBar.classList.add('bg-green-500');
+        if (progressHint) progressHint.classList.add('hidden');
+
+        updateMergeButton(false);
+
+        totalToRender = 0;
+        renderedCount = 0;
+
+        // Dispatch event immediately so cards can auto-expand
+        window.dispatchEvent(new CustomEvent('pages:renderComplete'));
+
+        setTimeout(() => {
+            progressContainer.classList.add('hidden');
+            progressBar.classList.remove('bg-green-500');
+            progressBar.classList.add('bg-blue-500');
+        }, 2000);
+    }
+
+    function renderNextProgressive() {
+        if (currentIndex >= pagesToRender.length) {
+            const remaining = allPagesGrid.querySelector('.page-thumb:not([data-rendered])');
+            if (remaining) {
+                renderUnrenderedThumb(remaining);
+            } else {
+                completeProgress();
+            }
+            return;
+        }
+
+        const { fileId, pageIndex } = pagesToRender[currentIndex];
+        const file = state.getFile(fileId);
+
+        if (!file) {
+            currentIndex++;
+            renderedCount++;
+            updateProgress();
+            requestAnimationFrame(renderNextProgressive);
+            return;
+        }
+
+        const thumb = createProgressiveThumb(file, pageIndex, handlers, currentIndex);
+        allPagesGrid.appendChild(thumb);
+
+        const canvas = thumb.querySelector('canvas');
+        const spinner = thumb.querySelector('.thumbnail-spinner');
+
+        const importedPage = file.importedPages?.find(p => p.newIndex === pageIndex);
+
+        const doRender = (pdfProxy, pageNum) => {
+            renderPdfPage(pdfProxy, pageNum, canvas, 0.25)
+                .finally(() => {
+                    spinner?.remove();
+                    thumb.dataset.rendered = 'true';
+                    currentIndex++;
+                    renderedCount++;
+                    updateProgress();
+
+                    if (window.requestIdleCallback) {
+                        requestIdleCallback(renderNextProgressive, { timeout: 100 });
+                    } else {
+                        setTimeout(renderNextProgressive, 10);
+                    }
+                });
+        };
+
+        if (importedPage) {
+            const sourceFile = state.getFile(importedPage.sourceFileId);
+            if (sourceFile) {
+                doRender(sourceFile.pdfProxy, importedPage.sourcePageIndex + 1);
+            } else {
+                spinner?.remove();
+                thumb.dataset.rendered = 'true';
+                currentIndex++;
+                renderedCount++;
+                updateProgress();
+                requestAnimationFrame(renderNextProgressive);
+            }
+        } else {
+            doRender(file.pdfProxy, pageIndex + 1);
+        }
+    }
+
+    // Helper to continue rendering remaining unrendered thumbs
+    function renderUnrenderedThumb(thumb) {
+        const pageIndex = parseInt(thumb.dataset.pageIndex);
+        const fileId = thumb.dataset.fileId;
+        const file = state.getFile(fileId);
+
+        if (!file) {
+            thumb.dataset.rendered = 'true';
+            renderedCount++;
+            totalToRender = Math.max(totalToRender, renderedCount);
+            updateProgress();
+            const next = allPagesGrid.querySelector('.page-thumb:not([data-rendered])');
+            if (next) {
+                requestAnimationFrame(() => renderUnrenderedThumb(next));
+            } else {
+                completeProgress();
+            }
+            return;
+        }
+
+        const canvas = thumb.querySelector('canvas');
+        const spinner = thumb.querySelector('.thumbnail-spinner');
+        const importedPage = file.importedPages?.find(p => p.newIndex === pageIndex);
+
+        const finishAndContinue = () => {
+            spinner?.remove();
+            thumb.dataset.rendered = 'true';
+            renderedCount++;
+            totalToRender = Math.max(totalToRender, renderedCount);
+            updateProgress();
+
+            const next = allPagesGrid.querySelector('.page-thumb:not([data-rendered])');
+            if (next) {
+                if (window.requestIdleCallback) {
+                    requestIdleCallback(() => renderUnrenderedThumb(next), { timeout: 100 });
+                } else {
+                    setTimeout(() => renderUnrenderedThumb(next), 10);
+                }
+            } else {
+                completeProgress();
+            }
+        };
+
+        if (importedPage) {
+            const sourceFile = state.getFile(importedPage.sourceFileId);
+            if (sourceFile) {
+                renderPdfPage(sourceFile.pdfProxy, importedPage.sourcePageIndex + 1, canvas, 0.25)
+                    .finally(finishAndContinue);
+            } else {
+                finishAndContinue();
+            }
+        } else {
+            renderPdfPage(file.pdfProxy, pageIndex + 1, canvas, 0.25)
+                .finally(finishAndContinue);
+        }
+    }
+
+    renderNextProgressive();
+}
+
+/**
+ * Create a page thumb for progressive rendering
+ */
+function createProgressiveThumb(file, pageIndex, handlers, globalIndex) {
+    return createPageThumb({
+        file,
+        pageIndex,
+        view: 'pages',
+        globalIndex,
+        onPreview: handlers.onPreview,
+        onRotate: (f, pi, el) => {
+            f.pageRotations[pi] = (f.pageRotations[pi] + 90) % 360;
+            el.querySelector('.canvas-wrapper').style.transform = `rotate(${f.pageRotations[pi]}deg)`;
+
+            const filesCard = pdfList.querySelector(`[data-file-id="${f.id}"]`);
+            if (filesCard) {
+                const filesThumb = filesCard.querySelector(`.page-thumb[data-page-index="${pi}"]`);
+                if (filesThumb) {
+                    const wrapper = filesThumb.querySelector('.canvas-wrapper');
+                    wrapper.style.transform = `rotate(${f.pageRotations[pi]}deg)`;
+                    const label = filesThumb.querySelector('.rotation-label');
+                    if (label) label.textContent = f.pageRotations[pi] > 0 ? f.pageRotations[pi] + '°' : '';
+                }
+            }
+            state.emit('page:rotated', { fileId: f.id, pageIndex: pi, rotation: f.pageRotations[pi] });
+        }
+    });
 }
 
 /**
@@ -440,7 +615,7 @@ export function showRenderProgress(pageCount) {
 
     if (progressContainer) {
         progressContainer.classList.remove('hidden');
-        progressText.textContent = `Preparing pages... (${pageCount} pages)`;
+        progressText.textContent = `Preparing pages: 0/${pageCount}`;
         progressPercent.textContent = '0%';
         progressBar.style.width = '0%';
         progressBar.classList.remove('bg-green-500');
@@ -456,153 +631,6 @@ export function showRenderProgress(pageCount) {
     }
 
     updateMergeButton(true);
-}
-
-/**
- * Pre-render ALL thumbnails in background (without observer)
- * Renders one at a time with yields to keep browser responsive
- * Uses global state tracking for additive progress (handles new files during rendering)
- */
-function preRenderPagesViewThumbnails() {
-    if (isRendering) return; // Already rendering, new pages will be picked up
-
-    isRendering = true;
-
-    // Initialize totals from current unrendered thumbs
-    const initialThumbs = allPagesGrid.querySelectorAll('.page-thumb:not([data-rendered])');
-    totalToRender = initialThumbs.length;
-    renderedCount = 0;
-
-    if (totalToRender === 0) {
-        isRendering = false;
-        return;
-    }
-
-    // Get progress bar elements
-    const progressContainer = document.getElementById('renderProgress');
-    const progressText = document.getElementById('renderProgressText');
-    const progressPercent = document.getElementById('renderProgressPercent');
-    const progressBar = document.getElementById('renderProgressBar');
-    const progressHint = document.getElementById('renderProgressHint');
-
-    // Show progress bar
-    if (progressContainer) {
-        progressContainer.classList.remove('hidden');
-        progressText.textContent = `Preparing pages: 0/${totalToRender}`;
-        progressPercent.textContent = '0%';
-        progressBar.style.width = '0%';
-        progressBar.classList.remove('bg-green-500');
-        progressBar.classList.add('bg-blue-500');
-
-        // Show cheeky message for large files
-        if (progressHint && totalToRender >= 50) {
-            progressHint.classList.remove('hidden');
-            progressHint.textContent = '☕ Whoa, big file! Sit tight while we prepare your pages...';
-        }
-    }
-
-    updateMergeButton(true);
-
-    function updateProgress() {
-        if (!progressContainer) return;
-        const percent = Math.round((renderedCount / totalToRender) * 100);
-        progressText.textContent = `Preparing pages: ${renderedCount}/${totalToRender}`;
-        progressPercent.textContent = `${percent}%`;
-        progressBar.style.width = `${percent}%`;
-    }
-
-    function completeProgress() {
-        isRendering = false;
-        if (!progressContainer) return;
-        progressText.textContent = 'All pages ready!';
-        progressPercent.textContent = '100%';
-        progressBar.style.width = '100%';
-        progressBar.classList.remove('bg-blue-500');
-        progressBar.classList.add('bg-green-500');
-        if (progressHint) progressHint.classList.add('hidden');
-
-        updateMergeButton(false);
-
-        // Reset global state
-        totalToRender = 0
-            ;
-        renderedCount = 0;
-
-        // Hide after a delay
-        setTimeout(() => {
-            progressContainer.classList.add('hidden');
-            progressBar.classList.remove('bg-green-500');
-            progressBar.classList.add('bg-blue-500');
-        }, 2000);
-    }
-
-    function renderNext() {
-        // Dynamically query for next unrendered thumb (picks up new files added during rendering)
-        const thumb = allPagesGrid.querySelector('.page-thumb:not([data-rendered])');
-
-        if (!thumb) {
-            // All done (including any new files that were added)
-            completeProgress();
-            return;
-        }
-
-        const pageIndex = parseInt(thumb.dataset.pageIndex);
-        const fileId = thumb.dataset.fileId;
-        const file = state.getFile(fileId);
-        if (!file) {
-            renderedCount++;
-            updateProgress();
-            requestAnimationFrame(renderNext);
-            return;
-        }
-
-        const canvas = thumb.querySelector('canvas');
-        const spinner = thumb.querySelector('.thumbnail-spinner');
-
-        const importedPage = file.importedPages?.find(p => p.newIndex === pageIndex);
-
-        if (importedPage) {
-            const sourceFile = state.getFile(importedPage.sourceFileId);
-            if (sourceFile) {
-                const sourcePageNum = importedPage.sourcePageIndex + 1;
-                renderPdfPage(sourceFile.pdfProxy, sourcePageNum, canvas, 0.25)
-                    .finally(() => {
-                        spinner?.remove();
-                        thumb.dataset.rendered = 'true';
-                        renderedCount++;
-                        updateProgress();
-                        if (window.requestIdleCallback) {
-                            requestIdleCallback(renderNext, { timeout: 100 });
-                        } else {
-                            setTimeout(renderNext, 10);
-                        }
-                    });
-            } else {
-                spinner?.remove();
-                thumb.dataset.rendered = 'true';
-                renderedCount++;
-                updateProgress();
-                requestAnimationFrame(renderNext);
-            }
-        } else {
-            const pageNum = pageIndex + 1;
-            renderPdfPage(file.pdfProxy, pageNum, canvas, 0.25)
-                .finally(() => {
-                    spinner?.remove();
-                    thumb.dataset.rendered = 'true';
-                    renderedCount++;
-                    updateProgress();
-                    if (window.requestIdleCallback) {
-                        requestIdleCallback(renderNext, { timeout: 100 });
-                    } else {
-                        setTimeout(renderNext, 10);
-                    }
-                });
-        }
-    }
-
-    // Start after a short delay to not compete with Files view
-    setTimeout(renderNext, 500);
 }
 
 
@@ -688,7 +716,6 @@ export function switchView(view, elements, handlers) {
  * Called when a page is moved between files
  */
 export function updatePageIdentity(oldFileId, oldIndex, newFileId, newIndex) {
-    // Find in Pages grid
     const thumb = allPagesGrid.querySelector(
         `.page-thumb[data-file-id="${oldFileId}"][data-page-index="${oldIndex}"]`
     );
@@ -704,6 +731,15 @@ export function updatePageIdentity(oldFileId, oldIndex, newFileId, newIndex) {
         const wrapper = thumb.querySelector('.canvas-wrapper');
         if (wrapper) {
             wrapper.style.borderLeftColor = `hsl(${hue}, 70%, 50%)`;
+        }
+    }
+
+    // Update text label (last child is the label div)
+    const newFile = state.getFile(newFileId);
+    if (newFile) {
+        const label = thumb.lastElementChild;
+        if (label && label.classList.contains('truncate')) {
+            label.textContent = `${newFile.name} p.${newIndex + 1}`;
         }
     }
 }
