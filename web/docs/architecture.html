@@ -204,6 +204,7 @@
             overflow-x: auto;
             margin: 20px 0;
             border: 2px solid #333;
+            white-space: pre;
         }
         
         .code-block .keyword { color: #c678dd; }
@@ -331,6 +332,61 @@
             border-radius: 4px;
             font-family: 'Fira Code', monospace;
             font-size: 0.85em;
+        }
+        
+        /* Mobile: hide arrows, stack boxes vertically */
+        @media (max-width: 600px) {
+            .flow {
+                flex-direction: column;
+                gap: 12px;
+            }
+            .arrow {
+                display: none;
+            }
+            /* Show down arrows between items on mobile (except last and stack boxes) */
+            .flow .box:not(:last-child):not(.stack)::after {
+                content: '↓';
+                display: block;
+                text-align: center;
+                font-size: 1.2rem;
+                color: #333;
+                margin-top: 12px;
+                position: absolute;
+                bottom: -28px;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+            .flow .box:not(.stack) {
+                position: relative;
+                margin-bottom: 16px;
+            }
+            /* Fix stack effect on mobile - convert to simple box with down arrow */
+            .box.stack {
+                position: relative;
+                margin-bottom: 36px;
+            }
+            .box.stack::before {
+                content: '↓';
+                position: absolute;
+                bottom: -32px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 1.2rem;
+                color: #333;
+                width: auto;
+                height: auto;
+                border: none;
+                background: none;
+                border-radius: 0;
+                z-index: 1;
+                top: auto;
+            }
+            .box.stack::after {
+                display: none;
+            }
+            .row-group {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -585,7 +641,8 @@ globalPageOrder = [
             <div class="section-title">The Import Process</div>
             <p class="section-intro">
                 <code>performCrossFileImport()</code> is a ~80 line function that handles all the state updates, 
-                DOM manipulations, and syncing required when a page moves between files.
+                DOM manipulations, and syncing required when a page moves between files. It's called when the 
+                detection algorithm (above) determines a cross-file import should happen.
             </p>
             
             <div class="flow">
@@ -594,6 +651,17 @@ globalPageOrder = [
                 <div class="box purple">2. Update DOM</div>
                 <span class="arrow">→</span>
                 <div class="box green">3. Clone for Files View</div>
+            </div>
+            
+            <div class="explanation">
+                <h4>Step 1: Update State</h4>
+                <p>First, I update the in-memory state to reflect the page's new ownership:</p>
+                <ul>
+                    <li><strong>Increment target's pageCount</strong> — The imported page gets a new index in File A.</li>
+                    <li><strong>Add to importedPages</strong> — Store a reference to the source file and original page index (not a copy of the data).</li>
+                    <li><strong>Remove from source's pageOrder</strong> — The page no longer belongs to File B.</li>
+                    <li><strong>Add to target's pageOrder</strong> — The page now belongs to File A.</li>
+                </ul>
             </div>
             
             <div class="code-block">
@@ -606,15 +674,48 @@ targetFile.importedPages.push({
 });
 sourceFile.pageOrder = sourceFile.pageOrder.filter(i => i !== originalPageIndex);
 targetFile.pageOrder.push(newPageIndex);
-
+            </div>
+            
+            <div class="explanation">
+                <h4>Step 2: Update DOM Attributes</h4>
+                <p>The dragged thumbnail element needs its data attributes updated so future operations know where it belongs:</p>
+                <ul>
+                    <li><code>data-file-id</code> — Now points to File A (the target).</li>
+                    <li><code>data-page-index</code> — The new index within File A.</li>
+                    <li><code>data-source-file-id</code> — Preserved reference to File B (needed for rendering).</li>
+                </ul>
+            </div>
+            
+            <div class="code-block">
 <span class="comment">// Step 2: Update the dragged element's data attributes</span>
 thumb.dataset.fileId = targetFileId;
 thumb.dataset.pageIndex = newPageIndex;
-thumb.dataset.sourceFileId = sourceFileId;  <span class="comment">// Keep reference</span>
-
+thumb.dataset.sourceFileId = sourceFileId;  <span class="comment">// Keep reference for rendering</span>
+            </div>
+            
+            <div class="explanation">
+                <h4>Step 3: Clone for Files View</h4>
+                <p>The Pages view already has the thumbnail in the correct position (the user just dragged it there). 
+                   But the Files view needs a copy of that thumbnail inside File A's card. This clone needs:</p>
+                <ul>
+                    <li><strong>Pixel data copied</strong> — <code>cloneNode()</code> doesn't copy canvas pixels!</li>
+                    <li><strong>Event handlers re-attached</strong> — <code>cloneNode()</code> doesn't copy event listeners!</li>
+                    <li><strong>Appended to target grid</strong> — The thumbnail appears in File A's expanded card.</li>
+                </ul>
+            </div>
+            
+            <div class="code-block">
 <span class="comment">// Step 3: Clone for Files view (if card is expanded)</span>
 <span class="keyword">const</span> clonedThumb = thumb.cloneNode(<span class="keyword">true</span>);
-<span class="comment">// ...copy canvas pixels, re-attach handlers...</span>
+
+<span class="comment">// Copy canvas pixels (cloneNode doesn't do this!)</span>
+<span class="keyword">const</span> ctx = clonedCanvas.getContext(<span class="string">'2d'</span>);
+ctx.drawImage(originalCanvas, 0, 0);
+
+<span class="comment">// Re-attach event handlers</span>
+previewBtn.addEventListener(<span class="string">'click'</span>, () => showPreview(targetFileId, newPageIndex));
+rotateBtn.addEventListener(<span class="string">'click'</span>, () => rotatePage(targetFileId, newPageIndex));
+
 targetGrid.appendChild(clonedThumb);
             </div>
         </div>
@@ -920,9 +1021,9 @@ wrapper.style.borderLeftColor = `hsl(${hue}, 70%, 50%)`;
             </div>
             
             <div class="explanation">
-                <p>The golden angle (≈137.5°) is the same angle used in plant phyllotaxis (leaf arrangement). 
-                It maximizes the angular separation between consecutive items, giving us visually distinct colors 
-                even with many files.</p>
+                <p>I was searching for a way to generate colors that stay distinct from each other, and stumbled upon something called the 
+                <a href="https://en.wikipedia.org/wiki/Golden_angle" target="_blank">golden angle</a> (137.5°). Turns out it's 
+                the same angle sunflowers use to pack seeds. Using it to step through the color wheel keeps consecutive files visually distinct.</p>
             </div>
         </div>
     </div>
