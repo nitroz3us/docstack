@@ -178,8 +178,15 @@ function updateUI(elements, skipPagesRender = false) {
 
 function deleteFile(fileId, elements) {
     state.removeFile(fileId);
+
+    // Remove from Files view
     const card = elements.pdfList.querySelector(`[data-file-id="${fileId}"]`);
     if (card) card.remove();
+
+    // Remove from Pages view
+    const pageThumbs = elements.allPagesGrid.querySelectorAll(`.page-thumb[data-file-id="${fileId}"]`);
+    pageThumbs.forEach(thumb => thumb.remove());
+
     updateUI(elements);
 }
 
