@@ -17,7 +17,6 @@ import { initMergeHandler, mergePDFs } from './handlers/merge.js';
 // ============================================
 
 export async function initApp() {
-    console.log('Initializing docstack...');
 
     // Initialize PDF.js
     const pdfjsLib = await import('../lib/pdf.min.mjs');
@@ -143,8 +142,6 @@ export async function initApp() {
             }
         });
     });
-
-    console.log('docstack initialized successfully!');
 }
 
 // ============================================
@@ -254,7 +251,7 @@ function handleCrossFileDrag(evt, sourceFileId) {
 
     // Update thumb element's data attributes (CRITICAL: update file ID!)
     evt.item.dataset.pageIndex = newPageIndex;
-    evt.item.dataset.fileId = targetFileId; // <-- This was missing!
+    evt.item.dataset.fileId = targetFileId;
     evt.item.dataset.sourceFileId = sourceFileId;
     evt.item.dataset.sourcePageIndex = pageIndex;
 
