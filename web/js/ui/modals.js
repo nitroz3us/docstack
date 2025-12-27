@@ -112,8 +112,19 @@ async function renderLightboxPage(animate = false) {
         await new Promise(r => setTimeout(r, 100));
     }
 
-    // Render at higher resolution for lightbox
-    await renderPdfPage(file.pdfProxy, pageNum, lightboxCanvas, 1.5);
+    // Check if this is an imported page
+    const importedPage = file.importedPages?.find(p => p.newIndex === pageIndex);
+
+    if (importedPage) {
+        // Render from source file
+        const sourceFile = state.getFile(importedPage.sourceFileId);
+        if (sourceFile) {
+            await renderPdfPage(sourceFile.pdfProxy, importedPage.sourcePageIndex + 1, lightboxCanvas, 1.5);
+        }
+    } else {
+        // Render at higher resolution for lightbox
+        await renderPdfPage(file.pdfProxy, pageNum, lightboxCanvas, 1.5);
+    }
 
     // Apply rotation via CSS
     lightboxCanvas.style.transform = rotation ? `rotate(${rotation}deg)` : '';

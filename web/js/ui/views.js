@@ -20,6 +20,138 @@ let isRendering = false;
 let totalToRender = 0;
 let renderedCount = 0;
 
+// Stored handlers for cloned elements
+let storedHandlers = null;
+
+/**
+ * Perform cross-file page import when page is dropped between pages of another file
+ * @param {HTMLElement} thumb - The page thumbnail element
+ * @param {string} sourceFileId - Original file ID
+ * @param {string} targetFileId - Target file ID to import into
+ */
+function performCrossFileImport(thumb, sourceFileId, targetFileId) {
+    const sourceFile = state.getFile(sourceFileId);
+    const targetFile = state.getFile(targetFileId);
+    if (!sourceFile || !targetFile) return;
+
+    const pageIndex = parseInt(thumb.dataset.pageIndex);
+    const rotation = sourceFile.pageRotations?.[pageIndex] || 0;
+
+    // Create new page index for target file
+    const newPageIndex = targetFile.pageCount;
+    targetFile.pageCount++;
+
+    // Initialize importedPages array if needed
+    if (!targetFile.importedPages) targetFile.importedPages = [];
+
+    // Store reference to source page data
+    targetFile.importedPages.push({
+        newIndex: newPageIndex,
+        sourceFileId: sourceFileId,
+        sourcePageIndex: pageIndex
+    });
+
+    // Copy rotation to target
+    if (!targetFile.pageRotations) targetFile.pageRotations = [];
+    targetFile.pageRotations[newPageIndex] = rotation;
+
+    // Update thumb element's data attributes
+    const oldPageIndex = pageIndex;
+    thumb.dataset.pageIndex = newPageIndex;
+    thumb.dataset.fileId = targetFileId;
+    thumb.dataset.sourceFileId = sourceFileId;
+    thumb.dataset.sourcePageIndex = oldPageIndex;
+
+    // Update label text
+    const label = thumb.lastElementChild;
+    if (label && label.classList.contains('truncate')) {
+        label.textContent = `${targetFile.name} p.${newPageIndex + 1}`;
+    }
+
+    // Remove from source pageOrder
+    sourceFile.pageOrder = sourceFile.pageOrder.filter(idx => idx !== pageIndex);
+
+    // Add to target pageOrder
+    targetFile.pageOrder.push(newPageIndex);
+
+    // Update page counts on cards
+    const sourceCard = pdfList.querySelector(`[data-file-id="${sourceFileId}"]`);
+    const targetCard = pdfList.querySelector(`[data-file-id="${targetFileId}"]`);
+
+    if (sourceCard) {
+        const countEl = sourceCard.querySelector('.page-count');
+        if (countEl) countEl.textContent = sourceFile.pageOrder.length;
+
+        // Remove thumb from source card's grid if present
+        const sourceGrid = sourceCard.querySelector('.pages-grid');
+        if (sourceGrid) {
+            const sourceThumb = sourceGrid.querySelector(`[data-page-index="${oldPageIndex}"]`);
+            if (sourceThumb) sourceThumb.remove();
+        }
+    }
+
+    if (targetCard) {
+        const countEl = targetCard.querySelector('.page-count');
+        if (countEl) countEl.textContent = targetFile.pageOrder.length;
+
+        // Add thumb clone to target card's grid if expanded
+        const targetGrid = targetCard.querySelector('.pages-grid');
+        if (targetGrid && targetGrid.children.length > 0) {
+            // Clone the thumb for Files view
+            const clonedThumb = thumb.cloneNode(true);
+
+            // Copy canvas content (cloneNode doesn't copy canvas pixels)
+            const originalCanvas = thumb.querySelector('canvas');
+            const clonedCanvas = clonedThumb.querySelector('canvas');
+            if (originalCanvas && clonedCanvas) {
+                const ctx = clonedCanvas.getContext('2d');
+                ctx.drawImage(originalCanvas, 0, 0);
+            }
+
+            // Re-attach event handlers (cloneNode doesn't copy event listeners)
+            const previewBtn = clonedThumb.querySelector('.preview-page-btn');
+            const rotateBtn = clonedThumb.querySelector('.rotate-btn');
+
+            if (previewBtn && storedHandlers?.onPreview) {
+                previewBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    storedHandlers.onPreview(targetFileId, newPageIndex);
+                });
+            }
+
+            if (rotateBtn) {
+                rotateBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+
+                    // Update rotation in state
+                    if (!targetFile.pageRotations) targetFile.pageRotations = [];
+                    targetFile.pageRotations[newPageIndex] = ((targetFile.pageRotations[newPageIndex] || 0) + 90) % 360;
+                    const rotation = targetFile.pageRotations[newPageIndex];
+
+                    // Rotate the canvas wrapper
+                    const wrapper = clonedThumb.querySelector('.canvas-wrapper');
+                    if (wrapper) wrapper.style.transform = `rotate(${rotation}deg)`;
+
+                    // Update rotation label
+                    const label = clonedThumb.querySelector('.rotation-label');
+                    if (label) label.textContent = rotation > 0 ? rotation + '°' : '';
+
+                    // Sync with Pages view
+                    const pagesThumb = document.querySelector(`.page-thumb[data-file-id="${targetFileId}"][data-page-index="${newPageIndex}"]`);
+                    if (pagesThumb) {
+                        const pagesWrapper = pagesThumb.querySelector('.canvas-wrapper');
+                        if (pagesWrapper) pagesWrapper.style.transform = `rotate(${rotation}deg)`;
+                    }
+
+                    state.emit('page:rotated', { fileId: targetFileId, pageIndex: newPageIndex, rotation });
+                });
+            }
+
+            targetGrid.appendChild(clonedThumb);
+        }
+    }
+}
+
 /**
  * Initialize view module with DOM references
  * @param {Object} elements - DOM element references
@@ -323,6 +455,9 @@ function setupFilesViewDeleteHandler(grid, file, handlers) {
  * @param {Object} handlers - Event handlers
  */
 export function preparePagesViewDom(handlers) {
+    // Store handlers for cross-file import cloning
+    storedHandlers = handlers;
+
     // Get existing file IDs in the grid
     const existingFileIds = new Set(
         Array.from(allPagesGrid.querySelectorAll('.page-thumb'))
@@ -346,12 +481,58 @@ export function preparePagesViewDom(handlers) {
             ghostClass: 'sortable-ghost',
             chosenClass: 'sortable-chosen',
             filter: 'button, .preview-page-btn, .rotate-btn, .delete-page-btn',
-            onEnd: () => {
-                const newOrder = Array.from(allPagesGrid.querySelectorAll('.page-thumb')).map(el => ({
+            onEnd: (evt) => {
+                const thumbs = Array.from(allPagesGrid.querySelectorAll('.page-thumb'));
+                const newOrder = thumbs.map(el => ({
                     fileId: el.dataset.fileId,
                     pageIndex: parseInt(el.dataset.pageIndex)
                 }));
-                state.setGlobalPageOrder(newOrder);
+
+                // Detect cross-file moves: check if dropped item is now surrounded by different file's pages
+                const droppedIndex = evt.newIndex;
+                const droppedThumb = thumbs[droppedIndex];
+                const droppedFileId = droppedThumb.dataset.fileId;
+
+                // Get neighbors
+                const prevThumb = droppedIndex > 0 ? thumbs[droppedIndex - 1] : null;
+                const nextThumb = droppedIndex < thumbs.length - 1 ? thumbs[droppedIndex + 1] : null;
+
+                let targetFileId = null;
+
+                // Check if dropped between pages of another file
+                if (prevThumb && nextThumb) {
+                    const prevFileId = prevThumb.dataset.fileId;
+                    const nextFileId = nextThumb.dataset.fileId;
+                    if (prevFileId === nextFileId && prevFileId !== droppedFileId) {
+                        targetFileId = prevFileId;
+                    }
+                } else if (prevThumb && prevThumb.dataset.fileId !== droppedFileId) {
+                    // Dropped at end, check if should join previous file
+                    const prevFileId = prevThumb.dataset.fileId;
+                    // Only import if prev page is from different file and there's no next from original file
+                    if (!nextThumb) {
+                        targetFileId = prevFileId;
+                    }
+                } else if (nextThumb && nextThumb.dataset.fileId !== droppedFileId) {
+                    // Dropped at start, check if should join next file
+                    const nextFileId = nextThumb.dataset.fileId;
+                    if (!prevThumb) {
+                        targetFileId = nextFileId;
+                    }
+                }
+
+                // Perform cross-file import if needed
+                if (targetFileId) {
+                    performCrossFileImport(droppedThumb, droppedFileId, targetFileId);
+                }
+
+                // Update global order
+                const finalOrder = thumbs.map(el => ({
+                    fileId: el.dataset.fileId,
+                    pageIndex: parseInt(el.dataset.pageIndex)
+                }));
+                state.setGlobalPageOrder(finalOrder);
+                syncFilesViewOrder();
             }
         });
         allPagesGrid.dataset.sortableInit = 'true';
@@ -765,3 +946,53 @@ export function syncPagesViewOrder() {
     // Append sorted items
     allPagesGrid.appendChild(fragment);
 }
+
+/**
+ * Sync Files view page grids with global page order
+ * When pages are reordered in Pages view, update the corresponding file cards
+ */
+export function syncFilesViewOrder() {
+    // Group global page order by file
+    const orderByFile = new Map();
+    state.globalPageOrder.forEach(({ fileId, pageIndex }) => {
+        if (!orderByFile.has(fileId)) {
+            orderByFile.set(fileId, []);
+        }
+        orderByFile.get(fileId).push(pageIndex);
+    });
+
+    // Update each file's pageOrder in state
+    orderByFile.forEach((newPageOrder, fileId) => {
+        const file = state.getFile(fileId);
+        if (file) {
+            file.pageOrder = newPageOrder;
+        }
+    });
+
+    // Reorder DOM in expanded file cards
+    orderByFile.forEach((newPageOrder, fileId) => {
+        const card = pdfList.querySelector(`[data-file-id="${fileId}"]`);
+        if (!card) return;
+
+        const grid = card.querySelector('.pages-grid');
+        if (!grid || grid.children.length === 0) return;
+
+        // Map existing thumbs
+        const existingThumbs = new Map();
+        Array.from(grid.children).forEach(el => {
+            existingThumbs.set(parseInt(el.dataset.pageIndex), el);
+        });
+
+        const fragment = document.createDocumentFragment();
+        newPageOrder.forEach(pageIndex => {
+            const thumb = existingThumbs.get(pageIndex);
+            if (thumb) {
+                fragment.appendChild(thumb);
+            }
+        });
+
+        grid.innerHTML = '';
+        grid.appendChild(fragment);
+    });
+}
+
