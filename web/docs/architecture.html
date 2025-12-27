@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docstack Architecture - Technical Deep Dive</title>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #fafafa;
+            min-height: 100vh;
+            color: #333;
+            padding: 40px 20px;
+            line-height: 1.7;
+        }
+        
+        h1 {
+            font-family: 'Caveat', cursive;
+            text-align: center;
+            font-size: 3rem;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 1rem;
+            margin-bottom: 40px;
+        }
+        
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 50px;
+            flex-wrap: wrap;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #666;
+            transition: all 0.2s;
+        }
+        
+        .tab:hover {
+            border-color: #333;
+            color: #333;
+        }
+        
+        .tab.active {
+            background: #333;
+            border-color: #333;
+            color: white;
+        }
+        
+        .diagram-container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: none;
+        }
+        
+        .diagram-container.active {
+            display: block;
+        }
+        
+        .section {
+            margin-bottom: 60px;
+        }
+        
+        .section-title {
+            font-family: 'Caveat', cursive;
+            font-size: 2rem;
+            color: #e74c3c;
+            margin-bottom: 20px;
+        }
+        
+        .section-intro {
+            color: #555;
+            font-size: 0.95rem;
+            margin-bottom: 25px;
+            max-width: 700px;
+        }
+        
+        .flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 30px 0;
+        }
+        
+        .box {
+            padding: 20px 30px;
+            border-radius: 12px;
+            border: 2px solid #333;
+            font-size: 0.95rem;
+            text-align: center;
+            position: relative;
+            background: white;
+            box-shadow: 3px 3px 0 rgba(0,0,0,0.1);
+        }
+        
+        .box.blue { background: #d4e5f7; }
+        .box.yellow { background: #fef3c7; }
+        .box.pink { background: #fce7f3; }
+        .box.purple { background: #e9d5ff; }
+        .box.cyan { background: #cffafe; }
+        .box.green { background: #d1fae5; }
+        .box.gray { background: #f3f4f6; }
+        .box.orange { background: #fed7aa; }
+        
+        .box small {
+            display: block;
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        .box.stack {
+            position: relative;
+        }
+        
+        .box.stack::before,
+        .box.stack::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 2px solid #333;
+            border-radius: 12px;
+            background: inherit;
+            z-index: -1;
+        }
+        
+        .box.stack::before {
+            top: 6px;
+            left: 6px;
+        }
+        
+        .box.stack::after {
+            top: 12px;
+            left: 12px;
+        }
+        
+        .arrow {
+            font-size: 1.5rem;
+            color: #333;
+        }
+        
+        .label {
+            font-family: 'Caveat', cursive;
+            font-size: 1.3rem;
+            color: #3b82f6;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .step-label {
+            font-family: 'Caveat', cursive;
+            font-size: 1.3rem;
+            color: #333;
+            text-align: center;
+            margin-top: 15px;
+        }
+        
+        .code-block {
+            background: #1e1e2e;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.8rem;
+            color: #e0e0e0;
+            overflow-x: auto;
+            margin: 20px 0;
+            border: 2px solid #333;
+        }
+        
+        .code-block .keyword { color: #c678dd; }
+        .code-block .string { color: #98c379; }
+        .code-block .comment { color: #6a6a8a; }
+        .code-block .function { color: #61afef; }
+        
+        .explanation {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px 25px;
+            margin: 25px 0;
+            color: #444;
+            font-size: 0.9rem;
+        }
+        
+        .explanation h4 {
+            font-size: 1rem;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .explanation ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        
+        .explanation li {
+            margin-bottom: 8px;
+        }
+        
+        .highlight {
+            background: #fef3c7;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+        
+        .highlight-blue {
+            background: #dbeafe;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+        
+        .highlight-pink {
+            background: #fce7f3;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+        
+        .vertical-flow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .arrow-down {
+            font-size: 1.5rem;
+            color: #333;
+        }
+        
+        .row-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .divider {
+            border: none;
+            border-top: 2px dashed #ddd;
+            margin: 50px 0;
+        }
+        
+        .callout {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 15px 20px;
+            margin: 20px 0;
+            font-size: 0.9rem;
+            color: #92400e;
+        }
+        
+        .callout-blue {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px 20px;
+            margin: 20px 0;
+            font-size: 0.9rem;
+            color: #1e40af;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .feature-card {
+            background: white;
+            border: 2px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 3px 3px 0 rgba(0,0,0,0.1);
+        }
+        
+        .feature-card h3 {
+            font-family: 'Caveat', cursive;
+            font-size: 1.4rem;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .feature-card p {
+            color: #555;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+        
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Docstack Architecture</h1>
+    <p class="subtitle">A Technical Deep Dive into the PDF Merger</p>
+    
+    <div class="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="state">State Management</button>
+        <button class="tab" data-tab="crossfile">Cross-File Sync</button>
+        <button class="tab" data-tab="rendering">Rendering Pipeline</button>
+        <button class="tab" data-tab="features">QoL Features</button>
+    </div>
+    
+    <!-- Overview Tab -->
+    <div class="diagram-container active" id="overview">
+        <div class="section">
+            <div class="section-title">High-Level Architecture</div>
+            <p class="section-intro">
+                Docstack is a client-side PDF merger built with vanilla JavaScript and ES6 modules. It uses 
+                <strong>PDF.js</strong> for parsing/rendering PDFs and <strong>pdf-lib</strong> for merging. 
+                The architecture follows a clear separation of concerns with distinct modules for state, views, and handlers.
+            </p>
+            
+            <div class="flow">
+                <div class="box gray stack">PDF Files<small>User uploads</small></div>
+                <span class="arrow">→</span>
+                <div class="box yellow">upload.js<small>Parse & validate</small></div>
+                <span class="arrow">→</span>
+                <div class="box green">state.js<small>Store in memory</small></div>
+                <span class="arrow">→</span>
+                <div class="box purple">views.js<small>Render to DOM</small></div>
+            </div>
+            
+            <div class="explanation">
+                <h4>The Flow Explained:</h4>
+                <ul>
+                    <li><strong>Upload:</strong> When a user drops PDFs, <code>upload.js</code> reads them as ArrayBuffers, loads them via PDF.js to get a <code>PDFDocumentProxy</code>, and extracts metadata (page count, name, size).</li>
+                    <li><strong>State:</strong> Each file is stored in <code>state.uploadedFiles[]</code> with its proxy, ArrayBuffer, and page order. The global merge order is tracked in <code>state.globalPageOrder[]</code>.</li>
+                    <li><strong>Render:</strong> <code>views.js</code> creates the UI for both "Files" and "Pages" views, rendering thumbnails progressively to avoid UI freezes.</li>
+                </ul>
+            </div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">Module Dependencies</div>
+            <p class="section-intro">
+                The codebase is organized into logical modules. The entry point (<code>app.js</code>) initializes everything 
+                and wires up event handlers. Each module has a single responsibility.
+            </p>
+            
+            <div class="vertical-flow">
+                <div class="box blue">app.js<small>Entry point & event wiring</small></div>
+                <span class="arrow-down">↓</span>
+                <div class="row-group">
+                    <div class="box green">state.js<small>Data store</small></div>
+                    <div class="box purple">views.js<small>UI rendering</small></div>
+                    <div class="box pink">modals.js<small>Lightbox/Help</small></div>
+                </div>
+                <span class="arrow-down">↓</span>
+                <div class="row-group">
+                    <div class="box yellow">components.js<small>Reusable UI</small></div>
+                    <div class="box cyan">pdf.js<small>PDF rendering</small></div>
+                    <div class="box orange">helpers.js<small>Utilities</small></div>
+                </div>
+            </div>
+            
+            <div class="explanation">
+                <h4>Module Responsibilities:</h4>
+                <ul>
+                    <li><code>app.js</code> — Loads PDF.js, initializes modules, sets up Sortable.js for drag-drop, handles file deletion and cross-file drags.</li>
+                    <li><code>state.js</code> — Single source of truth. Stores <code>uploadedFiles[]</code>, <code>globalPageOrder[]</code>, and <code>lightboxState</code>. Provides getters and event emitting.</li>
+                    <li><code>views.js</code> — The largest module. Handles both Files view (cards) and Pages view (flat grid), progressive rendering, and bidirectional sync.</li>
+                    <li><code>components.js</code> — Factory functions for creating page thumbnails and file cards with attached event handlers.</li>
+                    <li><code>modals.js</code> — Manages the page lightbox (full preview) with keyboard navigation and the help modal.</li>
+                    <li><code>pdf.js</code> — Wrapper around PDF.js. Provides <code>renderPdfPage()</code> to draw a page to a canvas at a given scale.</li>
+                    <li><code>helpers.js</code> — Utility functions like <code>getFileHue()</code> for color-coding and file size formatting.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- State Management Tab -->
+    <div class="diagram-container" id="state">
+        <div class="section">
+            <div class="section-title">State Structure</div>
+            <p class="section-intro">
+                All application state lives in <code>state.js</code>. This module maintains arrays for uploaded files, 
+                the global page order for merging, and transient UI state like the current lightbox position.
+            </p>
+            
+            <div class="code-block">
+<span class="comment">// Core state arrays</span>
+<span class="keyword">let</span> uploadedFiles = [];       <span class="comment">// All loaded PDF files</span>
+<span class="keyword">let</span> globalPageOrder = [];     <span class="comment">// Merge order: [{fileId, pageIndex}, ...]</span>
+<span class="keyword">let</span> lightboxState = { fileId: <span class="keyword">null</span>, orderIndex: 0 };
+
+<span class="comment">// Each file object structure:</span>
+{
+    id: <span class="string">"550e8400-e29b..."</span>,         <span class="comment">// UUID</span>
+    name: <span class="string">"document.pdf"</span>,           <span class="comment">// Original filename</span>
+    size: 1024000,                     <span class="comment">// Bytes</span>
+    pdfProxy: PDFDocumentProxy,        <span class="comment">// PDF.js document object</span>
+    arrayBuffer: ArrayBuffer,          <span class="comment">// Raw PDF data</span>
+    pageCount: 5,                      <span class="comment">// Total pages</span>
+    pageOrder: [0, 1, 2, 3, 4],        <span class="comment">// Current page arrangement</span>
+    pageRotations: { 0: 0, 1: 90 },    <span class="comment">// Rotation per page (degrees)</span>
+    importedPages: [                   <span class="comment">// Pages moved from other files</span>
+        {
+            newIndex: 5,               <span class="comment">// Index in THIS file</span>
+            sourceFileId: <span class="string">"uuid..."</span>,  <span class="comment">// Original file</span>
+            sourcePageIndex: 2         <span class="comment">// Original page index</span>
+        }
+    ]
+}
+            </div>
+            
+            <div class="callout">
+                <strong>Why store ArrayBuffer?</strong> While <code>pdfProxy</code> is used for rendering thumbnails and previews, 
+                the raw <code>arrayBuffer</code> is needed by pdf-lib during the merge operation since pdf-lib can't use PDF.js proxies.
+            </div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">Global Page Order</div>
+            <p class="section-intro">
+                The <code>globalPageOrder</code> array defines the final merge order. It's an array of objects, 
+                each pointing to a specific page in a specific file. This allows pages from multiple files to be interleaved.
+            </p>
+            
+            <div class="code-block">
+<span class="comment">// Example: Two files interleaved</span>
+globalPageOrder = [
+    { fileId: <span class="string">"file-A"</span>, pageIndex: 0 },  <span class="comment">// A page 1</span>
+    { fileId: <span class="string">"file-B"</span>, pageIndex: 0 },  <span class="comment">// B page 1</span>
+    { fileId: <span class="string">"file-A"</span>, pageIndex: 1 },  <span class="comment">// A page 2</span>
+    { fileId: <span class="string">"file-B"</span>, pageIndex: 1 },  <span class="comment">// B page 2</span>
+    { fileId: <span class="string">"file-B"</span>, pageIndex: 2 },  <span class="comment">// B page 3</span>
+];
+            </div>
+            
+            <div class="explanation">
+                <h4>How it syncs:</h4>
+                <ul>
+                    <li>When files are uploaded, <code>buildGlobalPageOrder()</code> creates a fresh order by iterating through all files and their <code>pageOrder</code> arrays.</li>
+                    <li>When pages are reordered in the <span class="highlight">Pages view</span>, <code>setGlobalPageOrder()</code> updates the state directly from the DOM order.</li>
+                    <li>When pages are reordered in the <span class="highlight-blue">Files view</span>, <code>syncPagesViewOrder()</code> rebuilds the Pages view to match.</li>
+                    <li>The <span class="highlight-pink">bidirectional sync</span> ensures both views always show the same logical order.</li>
+                </ul>
+            </div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">Imported Pages Mechanism</div>
+            <p class="section-intro">
+                When a page is "moved" from File B to File A via cross-file drag, it's not actually copied. Instead, 
+                File A stores a reference in its <code>importedPages</code> array pointing back to the source.
+            </p>
+            
+            <div class="flow">
+                <div class="box pink">File A<small>importedPages[0]</small></div>
+                <span class="arrow">→</span>
+                <div class="box gray">Reference<small>sourceFileId + pageIndex</small></div>
+                <span class="arrow">→</span>
+                <div class="box cyan">File B<small>Original PDF data</small></div>
+            </div>
+            
+            <div class="explanation">
+                <h4>Why use references?</h4>
+                <ul>
+                    <li><strong>Memory efficiency:</strong> I don't duplicate PDF data. The source file's <code>pdfProxy</code> is used for rendering.</li>
+                    <li><strong>Merge integrity:</strong> During merge, pdf-lib extracts the actual page from the source file's ArrayBuffer using the stored indices.</li>
+                    <li><strong>Visual tracking:</strong> Imported pages keep their original border color so users can see where they came from.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Cross-File Sync Tab -->
+    <div class="diagram-container" id="crossfile">
+        <div class="section">
+            <div class="section-title">Cross-File Page Import</div>
+            <p class="section-intro">
+                One of Docstack's key features is the ability to drag a page from one file and drop it into another file's 
+                position — directly in the Pages view. This triggers a "cross-file import" that updates both state and UI.
+            </p>
+            
+            <div class="label">Scenario: Drop File B's page between two File A pages</div>
+            
+            <div class="flow">
+                <div class="box pink stack">File A<small>page 1</small></div>
+                <div class="box cyan">Page X<small>from File B</small></div>
+                <div class="box pink stack">File A<small>page 2</small></div>
+            </div>
+            
+            <div class="callout-blue">
+                <strong>Result:</strong> Page X is now "owned" by File A. It appears in File A's card in the Files view, 
+                and File A's page count increases. File B's page count decreases.
+            </div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">Detection Algorithm</div>
+            <p class="section-intro">
+                When Sortable.js fires its <code>onEnd</code> event after a drag operation in the Pages view, 
+                I check if the dropped page is now "surrounded" by pages from a different file.
+            </p>
+            
+            <div class="code-block">
+<span class="comment">// In the Sortable onEnd handler:</span>
+<span class="keyword">const</span> droppedThumb = thumbs[evt.newIndex];
+<span class="keyword">const</span> droppedFileId = droppedThumb.dataset.fileId;
+
+<span class="comment">// Get neighbors</span>
+<span class="keyword">const</span> prevThumb = thumbs[evt.newIndex - 1];
+<span class="keyword">const</span> nextThumb = thumbs[evt.newIndex + 1];
+
+<span class="comment">// Check if BOTH neighbors are from the same file (not ours)</span>
+<span class="keyword">if</span> (prevThumb && nextThumb) {
+    <span class="keyword">const</span> prevFileId = prevThumb.dataset.fileId;
+    <span class="keyword">const</span> nextFileId = nextThumb.dataset.fileId;
+    
+    <span class="keyword">if</span> (prevFileId === nextFileId && prevFileId !== droppedFileId) {
+        <span class="comment">// Trigger cross-file import!</span>
+        performCrossFileImport(droppedThumb, droppedFileId, prevFileId);
+    }
+}
+            </div>
+            
+            <div class="explanation">
+                <h4>Edge cases handled:</h4>
+                <ul>
+                    <li><strong>Dropped at start:</strong> If there's no previous neighbor but next neighbor is from a different file, I check if import makes sense.</li>
+                    <li><strong>Dropped at end:</strong> Similar logic for when there's no next neighbor.</li>
+                    <li><strong>Same file reorder:</strong> If neighbors are from the same file as the dropped page, it's just a simple reorder — no import.</li>
+                </ul>
+            </div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">The Import Process</div>
+            <p class="section-intro">
+                <code>performCrossFileImport()</code> is a ~80 line function that handles all the state updates, 
+                DOM manipulations, and syncing required when a page moves between files.
+            </p>
+            
+            <div class="flow">
+                <div class="box yellow">1. Update State</div>
+                <span class="arrow">→</span>
+                <div class="box purple">2. Update DOM</div>
+                <span class="arrow">→</span>
+                <div class="box green">3. Clone for Files View</div>
+            </div>
+            
+            <div class="code-block">
+<span class="comment">// Step 1: State updates</span>
+<span class="keyword">const</span> newPageIndex = targetFile.pageCount++;
+targetFile.importedPages.push({
+    newIndex: newPageIndex,
+    sourceFileId: sourceFileId,
+    sourcePageIndex: originalPageIndex
+});
+sourceFile.pageOrder = sourceFile.pageOrder.filter(i => i !== originalPageIndex);
+targetFile.pageOrder.push(newPageIndex);
+
+<span class="comment">// Step 2: Update the dragged element's data attributes</span>
+thumb.dataset.fileId = targetFileId;
+thumb.dataset.pageIndex = newPageIndex;
+thumb.dataset.sourceFileId = sourceFileId;  <span class="comment">// Keep reference</span>
+
+<span class="comment">// Step 3: Clone for Files view (if card is expanded)</span>
+<span class="keyword">const</span> clonedThumb = thumb.cloneNode(<span class="keyword">true</span>);
+<span class="comment">// ...copy canvas pixels, re-attach handlers...</span>
+targetGrid.appendChild(clonedThumb);
+            </div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">Canvas Cloning Gotcha</div>
+            <p class="section-intro">
+                When cloning a thumbnail to show in the Files view, I discovered that <code>cloneNode(true)</code> 
+                doesn't copy canvas pixel data. The cloned canvas is blank!
+            </p>
+            
+            <div class="code-block">
+<span class="comment">// The problem: blank canvas after clone</span>
+<span class="keyword">const</span> clonedThumb = thumb.cloneNode(<span class="keyword">true</span>);
+<span class="comment">// clonedThumb's canvas is EMPTY!</span>
+
+<span class="comment">// The solution: manually copy pixels</span>
+<span class="keyword">const</span> originalCanvas = thumb.querySelector(<span class="string">'canvas'</span>);
+<span class="keyword">const</span> clonedCanvas = clonedThumb.querySelector(<span class="string">'canvas'</span>);
+<span class="keyword">const</span> ctx = clonedCanvas.getContext(<span class="string">'2d'</span>);
+ctx.drawImage(originalCanvas, 0, 0);  <span class="comment">// Copy pixels!</span>
+            </div>
+            
+            <div class="callout">
+                <strong>Another gotcha:</strong> <code>cloneNode()</code> also doesn't copy event listeners! 
+                I have to manually re-attach click handlers for the preview, rotate, and delete buttons on the cloned element.
+            </div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">Bidirectional Sync</div>
+            
+            <div class="flow">
+                <div class="box blue">Files View</div>
+                <span class="arrow">⟷</span>
+                <div class="box green">globalPageOrder</div>
+                <span class="arrow">⟷</span>
+                <div class="box purple">Pages View</div>
+            </div>
+            
+            <div class="explanation">
+                <h4>Sync functions:</h4>
+                <ul>
+                    <li><code>syncPagesViewOrder()</code> — Called after Files view reorder. Rebuilds <code>globalPageOrder</code> from file states, then reorders Pages view DOM.</li>
+                    <li><code>syncFilesViewOrder()</code> — Called after Pages view reorder. Groups <code>globalPageOrder</code> by file, updates each file's <code>pageOrder</code>, reorders each card's grid.</li>
+                    <li>Both functions preserve rendered thumbnails — they just move existing DOM elements rather than re-rendering.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Rendering Pipeline Tab -->
+    <div class="diagram-container" id="rendering">
+        <div class="section">
+            <div class="section-title">Progressive Rendering</div>
+            <p class="section-intro">
+                Rendering PDF thumbnails is expensive. A naive approach would freeze the UI while rendering all pages. 
+                Docstack uses <strong>progressive rendering</strong> — thumbnails are created and rendered one at a time 
+                with idle callbacks, keeping the UI responsive.
+            </p>
+            
+            <div class="flow">
+                <div class="box gray stack">Pages queue</div>
+                <span class="arrow">→</span>
+                <div class="box yellow">createThumb()</div>
+                <span class="arrow">→</span>
+                <div class="box cyan">renderPdfPage()</div>
+                <span class="arrow">→</span>
+                <div class="box green">requestIdleCallback</div>
+                <span class="arrow">↺</span>
+            </div>
+            
+            <div class="step-label">Loop continues until all pages rendered</div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">The Render Loop</div>
+            
+            <div class="code-block">
+<span class="keyword">function</span> <span class="function">startProgressiveRendering</span>(pagesToRender) {
+    <span class="keyword">let</span> currentIndex = 0;
+    
+    <span class="keyword">function</span> <span class="function">renderNext</span>() {
+        <span class="keyword">if</span> (currentIndex >= pagesToRender.length) {
+            completeProgress();  <span class="comment">// All done!</span>
+            <span class="keyword">return</span>;
+        }
+        
+        <span class="keyword">const</span> { fileId, pageIndex } = pagesToRender[currentIndex];
+        <span class="keyword">const</span> file = state.getFile(fileId);
+        
+        <span class="comment">// Create DOM element</span>
+        <span class="keyword">const</span> thumb = createProgressiveThumb(file, pageIndex);
+        allPagesGrid.appendChild(thumb);
+        
+        <span class="comment">// Render PDF page to canvas</span>
+        <span class="keyword">const</span> canvas = thumb.querySelector(<span class="string">'canvas'</span>);
+        renderPdfPage(file.pdfProxy, pageIndex + 1, canvas, 0.25)
+            .finally(() => {
+                currentIndex++;
+                renderedCount++;
+                updateProgress();  <span class="comment">// Update "Preparing X/Y"</span>
+                
+                <span class="comment">// Schedule next render during browser idle time</span>
+                <span class="keyword">if</span> (window.requestIdleCallback) {
+                    requestIdleCallback(renderNext, { timeout: 100 });
+                } <span class="keyword">else</span> {
+                    setTimeout(renderNext, 10);
+                }
+            });
+    }
+    
+    renderNext();  <span class="comment">// Start the loop</span>
+}
+            </div>
+            
+            <div class="explanation">
+                <h4>Why requestIdleCallback?</h4>
+                <ul>
+                    <li>It runs the callback when the browser is idle (between frames), preventing jank.</li>
+                    <li>The <code>timeout: 100</code> ensures it still runs even if the browser is busy.</li>
+                    <li>Fallback to <code>setTimeout</code> for browsers that don't support it.</li>
+                </ul>
+            </div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">Rendering Imported Pages</div>
+            <p class="section-intro">
+                When rendering a thumbnail, I need to check if it's an imported page. If so, I render from the 
+                <strong>source file's</strong> PDF proxy, not the current file's. This is a critical piece of logic 
+                that applies to thumbnails, lightbox previews, and the final merge.
+            </p>
+            
+            <div class="explanation">
+                <h4>Why can't I render from the current file?</h4>
+                <p>When a page is "imported" to File A from File B, I don't actually copy any PDF data. I only store a <strong>reference</strong> 
+                (the source file ID and source page index). File A's <code>pdfProxy</code> still only contains its original pages.</p>
+                <ul>
+                    <li><strong>File A has 2 pages:</strong> Its <code>pdfProxy</code> can render pages 1 and 2.</li>
+                    <li><strong>I import File B's page 3:</strong> File A's <code>pageCount</code> becomes 3, and the imported page gets <code>newIndex: 2</code>.</li>
+                    <li><strong>Problem:</strong> If I try to render <code>pdfProxy.getPage(3)</code> on File A, it fails or returns wrong content — File A only has 2 real pages!</li>
+                    <li><strong>Solution:</strong> I check <code>importedPages</code>, find the source file (File B), and render <code>sourceFile.pdfProxy.getPage(3)</code> instead.</li>
+                </ul>
+            </div>
+            
+            <div class="flow">
+                <div class="box pink">Page belongs<br>to File A?</div>
+                <span class="arrow">→</span>
+                <div class="box yellow">Is it in<br>importedPages?</div>
+                <span class="arrow">→</span>
+                <div class="box cyan">Render from<br>Source File B</div>
+            </div>
+            
+            <div class="code-block">
+<span class="comment">// Check if this page was imported from another file</span>
+<span class="keyword">const</span> importedPage = file.importedPages?.find(p => p.newIndex === pageIndex);
+
+<span class="keyword">if</span> (importedPage) {
+    <span class="comment">// This page doesn't exist in file.pdfProxy!</span>
+    <span class="comment">// I need to get the ACTUAL PDF data from the source file</span>
+    <span class="keyword">const</span> sourceFile = state.getFile(importedPage.sourceFileId);
+    <span class="keyword">await</span> renderPdfPage(
+        sourceFile.pdfProxy,                    <span class="comment">// Use SOURCE file's PDF proxy</span>
+        importedPage.sourcePageIndex + 1,       <span class="comment">// Original page number (1-indexed)</span>
+        canvas,
+        scale
+    );
+} <span class="keyword">else</span> {
+    <span class="comment">// Normal page - render from current file as usual</span>
+    <span class="keyword">await</span> renderPdfPage(file.pdfProxy, pageIndex + 1, canvas, scale);
+}
+            </div>
+            
+            <div class="callout">
+                <strong>Same logic everywhere:</strong> This check happens in 4 places:
+                <ul style="margin-top: 8px; margin-left: 20px;">
+                    <li><strong>Thumbnail rendering</strong> (Files view cards)</li>
+                    <li><strong>Pages view rendering</strong> (flat grid)</li>
+                    <li><strong>Lightbox preview</strong> (full-size preview modal)</li>
+                    <li><strong>Merge operation</strong> (when building the final PDF, pdf-lib copies from source ArrayBuffer)</li>
+                </ul>
+            </div>
+            
+            <div class="callout-blue">
+                <strong>Why not just copy the PDF data?</strong> Duplicating page data would waste memory, especially for large PDFs. 
+                By storing references, I keep memory usage constant regardless of how many times pages are moved between files.
+            </div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">Progress Tracking</div>
+            
+            <div class="code-block">
+<span class="comment">// Module-level state</span>
+<span class="keyword">let</span> isRendering = <span class="keyword">false</span>;
+<span class="keyword">let</span> totalToRender = 0;
+<span class="keyword">let</span> renderedCount = 0;
+
+<span class="keyword">function</span> <span class="function">updateProgress</span>() {
+    <span class="keyword">const</span> progressText = document.getElementById(<span class="string">'progress-text'</span>);
+    progressText.textContent = `Preparing ${renderedCount}/${totalToRender}`;
+    
+    <span class="keyword">const</span> progressBar = document.getElementById(<span class="string">'progress-bar'</span>);
+    progressBar.style.width = `${(renderedCount / totalToRender) * 100}%`;
+}
+
+<span class="keyword">function</span> <span class="function">completeProgress</span>() {
+    isRendering = <span class="keyword">false</span>;
+    progressBar.classList.add(<span class="string">'hidden'</span>);
+    mergeBtn.disabled = <span class="keyword">false</span>;  <span class="comment">// Re-enable merge button</span>
+}
+            </div>
+        </div>
+    </div>
+    
+    <!-- QoL Features Tab -->
+    <div class="diagram-container" id="features">
+        <div class="section">
+            <div class="section-title">Quality of Life Features</div>
+            <p class="section-intro">
+                Beyond the core functionality, Docstack includes many small details that make it feel polished. 
+                Here's a deep dive into each feature and how it's implemented.
+            </p>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>Cross-File Drag (Pages View)</h3>
+                    <p>Drop a page <span class="highlight">between two pages</span> of another file to import it. 
+                    Detection uses neighbor checking in Sortable's <code>onEnd</code>. The page gets a new index in the target file 
+                    while storing a reference back to its source.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>Color-Coded Borders</h3>
+                    <p>Each file gets a unique <span class="highlight">HSL hue</span> based on its index: <code>hue = (index * 137) % 360</code>. 
+                    The golden angle (137°) ensures visually distinct colors. Imported pages keep their original color for tracking.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>Bidirectional Sync</h3>
+                    <p>Reordering in either view syncs to the other. Files view reorder → <code>syncPagesViewOrder()</code>. 
+                    Pages view reorder → <code>syncFilesViewOrder()</code>. Both preserve existing rendered thumbnails.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>Imported Page Lightbox</h3>
+                    <p>The lightbox checks <code>file.importedPages</code> to find the source file and page index. 
+                    It then renders from <code>sourceFile.pdfProxy</code> at 1.5x scale for crisp preview.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>Rotation Sync</h3>
+                    <p>Rotating in Files view syncs to Pages view by querying <code>.page-thumb[data-file-id][data-page-index]</code> 
+                    and applying the same CSS transform. Rotation is stored in <code>file.pageRotations[pageIndex]</code>.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>Clean Deletion</h3>
+                    <p>Deleting a file removes its pages from <strong>both views</strong>. The <code>deleteFile()</code> function queries 
+                    <code>allPagesGrid</code> for thumbs with matching <code>data-file-id</code> and removes them.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>Live Progress Bar</h3>
+                    <p>Shows <span class="highlight">"Preparing X/Y"</span> with animated bar. The merge button is disabled during rendering 
+                    (<code>isRendering</code> flag) to prevent conflicts.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>Event Handler Cloning</h3>
+                    <p>When cloning thumbnails, event listeners aren't copied by <code>cloneNode()</code>. 
+                    I manually re-attach click handlers for preview, rotate, and delete using stored handler references.</p>
+                </div>
+            </div>
+        </div>
+        
+        <hr class="divider">
+        
+        <div class="section">
+            <div class="section-title">File Hue Algorithm</div>
+            
+            <div class="code-block">
+<span class="comment">// helpers.js</span>
+<span class="keyword">export function</span> <span class="function">getFileHue</span>(fileIndex) {
+    <span class="comment">// Golden angle ensures visually distinct colors</span>
+    <span class="keyword">return</span> (fileIndex * 137.508) % 360;
+}
+
+<span class="comment">// Usage in components.js</span>
+<span class="keyword">const</span> hue = getFileHue(fileIndex);
+wrapper.style.borderLeftColor = `hsl(${hue}, 70%, 50%)`;
+            </div>
+            
+            <div class="explanation">
+                <p>The golden angle (≈137.5°) is the same angle used in plant phyllotaxis (leaf arrangement). 
+                It maximizes the angular separation between consecutive items, giving us visually distinct colors 
+                even with many files.</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.diagram-container').forEach(d => d.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>
