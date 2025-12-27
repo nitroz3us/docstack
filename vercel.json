@@ -2,6 +2,7 @@
     "buildCommand": null,
     "outputDirectory": "web",
     "framework": null,
+    "cleanUrls": true,
     "regions": [
         "sin1"
     ]
