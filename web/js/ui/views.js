@@ -724,15 +724,7 @@ export function updatePageIdentity(oldFileId, oldIndex, newFileId, newIndex) {
     thumb.dataset.fileId = newFileId;
     thumb.dataset.pageIndex = newIndex;
 
-    // Update color
-    const fileIndex = state.uploadedFiles.findIndex(f => f.id === newFileId);
-    if (fileIndex !== -1) {
-        const hue = getFileHue(fileIndex);
-        const wrapper = thumb.querySelector('.canvas-wrapper');
-        if (wrapper) {
-            wrapper.style.borderLeftColor = `hsl(${hue}, 70%, 50%)`;
-        }
-    }
+    // Keep original color (for visual tracking of source)
 
     // Update text label (last child is the label div)
     const newFile = state.getFile(newFileId);
