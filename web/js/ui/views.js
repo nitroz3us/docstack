@@ -7,7 +7,6 @@
 import * as state from '../state.js';
 import { createPageThumb, createFileCard } from './components.js';
 import { renderPdfPage } from '../utils/pdf.js';
-import { getFileHue } from '../utils/helpers.js';
 
 // DOM element references (set during initialization)
 let pdfList = null;
@@ -226,128 +225,93 @@ export function addFileCard(file, handlers) {
 }
 
 /**
- * Render expanded file grid with background pre-rendering
- * Pre-renders all thumbnails one at a time
+ * Render expanded file grid with progressive rendering
+ * Creates DOM and renders each thumbnail one at a time (same pattern as Pages view)
  * @param {Object} file - File object
  * @param {HTMLElement} grid - Grid container
  * @param {Object} handlers - Event handlers
  */
 export function renderFileGrid(file, grid, handlers) {
-    // Create DOM elements for all pages first
     let currentIndex = 0;
-    const batchSize = 100;
 
-    function createBatch() {
-        const limit = Math.min(currentIndex + batchSize, file.pageOrder.length);
+    function renderNextProgressive() {
+        if (currentIndex >= file.pageOrder.length) {
+            return; // All done
+        }
 
-        for (let i = currentIndex; i < limit; i++) {
-            const pageIndex = file.pageOrder[i];
+        const pageIndex = file.pageOrder[currentIndex];
 
-            const thumb = createPageThumb({
-                file,
-                pageIndex,
-                view: 'files',
-                onPreview: handlers.onPreview,
-                onRotate: (f, pi, el) => {
-                    f.pageRotations[pi] = (f.pageRotations[pi] + 90) % 360;
+        const thumb = createPageThumb({
+            file,
+            pageIndex,
+            view: 'files',
+            onPreview: handlers.onPreview,
+            onRotate: (f, pi, el) => {
+                f.pageRotations[pi] = (f.pageRotations[pi] + 90) % 360;
 
-                    const wrapper = el.querySelector('.canvas-wrapper');
+                const wrapper = el.querySelector('.canvas-wrapper');
+                wrapper.style.transform = `rotate(${f.pageRotations[pi]}deg)`;
+
+                const label = el.querySelector('.rotation-label');
+                label.textContent = f.pageRotations[pi] > 0 ? f.pageRotations[pi] + '°' : '';
+
+                // Sync with Pages view
+                const pagesThumb = document.querySelector(`.page-thumb[data-file-id="${f.id}"][data-page-index="${pi}"]`);
+                if (pagesThumb) {
+                    const wrapper = pagesThumb.querySelector('.canvas-wrapper');
                     wrapper.style.transform = `rotate(${f.pageRotations[pi]}deg)`;
-
-                    const label = el.querySelector('.rotation-label');
-                    label.textContent = f.pageRotations[pi] > 0 ? f.pageRotations[pi] + '°' : '';
-
-                    // Sync with Pages view
-                    const pagesThumb = document.querySelector(`.page-thumb[data-file-id="${f.id}"][data-page-index="${pi}"]`);
-                    if (pagesThumb) {
-                        const wrapper = pagesThumb.querySelector('.canvas-wrapper');
-                        wrapper.style.transform = `rotate(${f.pageRotations[pi]}deg)`;
-                    }
-
-                    state.emit('page:rotated', { fileId: f.id, pageIndex: pi, rotation: f.pageRotations[pi] });
                 }
-            });
 
-            grid.appendChild(thumb);
-        }
+                state.emit('page:rotated', { fileId: f.id, pageIndex: pi, rotation: f.pageRotations[pi] });
+            }
+        });
 
-        currentIndex += batchSize;
-        if (currentIndex < file.pageOrder.length) {
-            requestAnimationFrame(createBatch);
-        } else {
-            // DOM complete, start background rendering
-            preRenderFileGridThumbnails(file, grid);
-        }
-    }
+        grid.appendChild(thumb);
 
-    createBatch();
-}
-
-/**
- * Pre-render all thumbnails in a file grid (background, one at a time)
- */
-function preRenderFileGridThumbnails(file, grid) {
-    const thumbs = grid.querySelectorAll('.page-thumb:not([data-rendered])');
-    const toRender = Array.from(thumbs);
-
-    let renderIndex = 0;
-
-    function renderNext() {
-        if (renderIndex >= toRender.length) return;
-
-        const thumb = toRender[renderIndex];
-        if (thumb.dataset.rendered) {
-            renderIndex++;
-            requestAnimationFrame(renderNext);
-            return;
-        }
-
-        const pageIndex = parseInt(thumb.dataset.pageIndex);
+        // Now render the canvas for this thumb
         const canvas = thumb.querySelector('canvas');
         const spinner = thumb.querySelector('.thumbnail-spinner');
 
         // Check if this is an imported page
         const importedPage = file.importedPages?.find(p => p.newIndex === pageIndex);
 
-        if (importedPage) {
-            const sourceFile = state.getFile(importedPage.sourceFileId);
-            if (sourceFile) {
-                const sourcePageNum = importedPage.sourcePageIndex + 1;
-                renderPdfPage(sourceFile.pdfProxy, sourcePageNum, canvas, 0.25)
-                    .finally(() => {
-                        spinner?.remove();
-                        thumb.dataset.rendered = 'true';
-                        renderIndex++;
-                        if (window.requestIdleCallback) {
-                            requestIdleCallback(renderNext, { timeout: 100 });
-                        } else {
-                            setTimeout(renderNext, 10);
-                        }
-                    });
-            } else {
-                spinner?.remove();
-                renderIndex++;
-                requestAnimationFrame(renderNext);
-            }
-        } else {
-            const pageNum = pageIndex + 1;
-            renderPdfPage(file.pdfProxy, pageNum, canvas, 0.25)
+        const doRender = (pdfProxy, pageNum) => {
+            renderPdfPage(pdfProxy, pageNum, canvas, 0.25)
                 .finally(() => {
                     spinner?.remove();
                     thumb.dataset.rendered = 'true';
-                    renderIndex++;
+                    currentIndex++;
+
+                    // Schedule next render
                     if (window.requestIdleCallback) {
-                        requestIdleCallback(renderNext, { timeout: 100 });
+                        requestIdleCallback(renderNextProgressive, { timeout: 100 });
                     } else {
-                        setTimeout(renderNext, 10);
+                        setTimeout(renderNextProgressive, 10);
                     }
                 });
+        };
+
+        if (importedPage) {
+            const sourceFile = state.getFile(importedPage.sourceFileId);
+            if (sourceFile) {
+                doRender(sourceFile.pdfProxy, importedPage.sourcePageIndex + 1);
+            } else {
+                spinner?.remove();
+                thumb.dataset.rendered = 'true';
+                currentIndex++;
+                requestAnimationFrame(renderNextProgressive);
+            }
+        } else {
+            doRender(file.pdfProxy, pageIndex + 1);
         }
     }
 
-    // Start rendering
-    renderNext();
+    // Start progressive rendering
+    renderNextProgressive();
 }
+
+
+
 
 /**
  * Toggle file card expansion
