@@ -128,15 +128,54 @@ async function loadPdfForMerge(arrayBuffer, password) {
 export async function mergePDFs(showLoading, hideLoading) {
     if (state.uploadedFiles.length === 0) return;
 
-    // Check if any files are password-protected
-    const passwordProtectedFiles = state.uploadedFiles.filter(f => isPasswordProtected(f));
+    // Check for restricted files (both password-protected and owner-restricted)
+    const restrictedFiles = [];
+    const checkCache = {}; // Avoid checking same file multiple times if used in multiple pages logic
 
-    if (passwordProtectedFiles.length > 0) {
-        const proceed = await showEncryptionWarningModal(passwordProtectedFiles);
-        if (!proceed) return;
+    // Helper to check if a file needs image fallback
+    const checkFile = async (file) => {
+        if (checkCache[file.id]) return checkCache[file.id];
+
+        let isRestricted = false;
+
+        // Case 1: Has user password
+        if (isPasswordProtected(file)) {
+            isRestricted = true;
+        }
+        // Case 2: Check for owner restrictions by trying to load with pdf-lib
+        else {
+            try {
+                // If this throws "encrypted", it's restricted
+                await PDFDocument.load(file.arrayBuffer);
+            } catch (error) {
+                if (error.message?.includes('encrypted')) {
+                    isRestricted = true;
+                }
+            }
+        }
+
+        checkCache[file.id] = isRestricted;
+        return isRestricted;
+    };
+
+    // Check all uploaded files
+    showLoading('Checking file permissions...');
+
+    for (const file of state.uploadedFiles) {
+        if (await checkFile(file)) {
+            restrictedFiles.push(file);
+        }
     }
 
-    showLoading('Merging PDFs...');
+    if (restrictedFiles.length > 0) {
+        hideLoading(); // Hide loading while modal is shown
+        const proceed = await showEncryptionWarningModal(restrictedFiles);
+        if (!proceed) return;
+        showLoading('Merging PDFs...'); // Show loading again
+    } else {
+        // Just update loading text
+        showLoading('Merging PDFs...');
+    }
 
     try {
         const mergedPdf = await PDFDocument.create();

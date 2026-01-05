@@ -213,37 +213,37 @@
 
     <!-- Encryption Warning Modal -->
     <div id="encryptionWarningModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-        <div class="bg-white rounded-lg max-w-sm w-full overflow-hidden shadow-xl">
+        <div class="bg-white rounded-lg max-w-md w-full overflow-hidden shadow-xl">
             <div class="flex items-center justify-between p-4 border-b border-gray-100">
-                <h3 class="font-medium text-gray-900 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <h3 class="text-lg font-medium text-gray-900 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     Protected Files Warning
                 </h3>
             </div>
-            <div class="p-5">
-                <p class="text-sm text-gray-600 mb-3">The following files are password-protected:</p>
-                <div id="warningFileList" class="bg-gray-50 rounded-lg p-3 mb-4 text-xs font-mono text-gray-700 max-h-32 overflow-y-auto border border-gray-100"></div>
+            <div class="p-6">
+                <p class="text-base text-gray-600 mb-4">The following files are password-protected:</p>
+                <div id="warningFileList" class="bg-gray-50 rounded-lg p-4 mb-5 text-sm font-mono text-gray-700 max-h-48 overflow-y-auto border border-gray-100"></div>
                 
-                <div class="bg-amber-50 border border-amber-100 rounded-lg p-3 mb-4">
-                    <h4 class="text-xs font-semibold text-amber-800 mb-1">⚠️ Limitation:</h4>
-                    <ul class="text-xs text-amber-700 space-y-1 list-disc list-inside">
+                <div class="bg-amber-50 border border-amber-100 rounded-lg p-4 mb-5">
+                    <h4 class="text-sm font-semibold text-amber-800 mb-2">⚠️ Limitation:</h4>
+                    <ul class="text-sm text-amber-700 space-y-1.5 list-disc list-inside">
                         <li>Text will <strong>NOT</strong> be selectable or searchable</li>
                         <li>Pages will be embedded as images</li>
                         <li>Quality may be slightly reduced at high zoom</li>
                     </ul>
                 </div>
 
-                <p class="text-xs text-gray-500 mb-4">
+                <p class="text-sm text-gray-500 mb-6">
                     Tip: For selectable text, remove the password using Adobe or Preview first.
                 </p>
 
                 <div class="flex gap-3">
-                    <button id="cancelWarningBtn" class="flex-1 py-2.5 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    <button id="cancelWarningBtn" class="flex-1 py-2.5 px-4 border border-gray-300 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                         Go Back
                     </button>
-                    <button id="proceedWarningBtn" class="flex-1 py-2.5 px-4 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+                    <button id="proceedWarningBtn" class="flex-1 py-2.5 px-4 bg-gray-900 text-white rounded-lg text-base font-medium hover:bg-gray-800 transition-colors">
                         Merge Anyway
                     </button>
                 </div>
