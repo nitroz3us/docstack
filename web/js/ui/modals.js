@@ -22,6 +22,11 @@ let passwordError = null;
 let passwordModalFileName = null;
 let passwordResolve = null; // Promise resolver for password modal
 
+// Encryption Warning modal references
+let encryptionWarningModal = null;
+let warningFileList = null;
+let encryptionWarningResolve = null;
+
 /**
  * Initialize modals module with DOM references
  * @param {Object} elements - DOM element references
@@ -39,6 +44,10 @@ export function initModals(elements) {
     passwordInput = elements.passwordInput;
     passwordError = elements.passwordError;
     passwordModalFileName = elements.passwordModalFileName;
+
+    // Encryption Warning modal references
+    encryptionWarningModal = elements.encryptionWarningModal;
+    warningFileList = elements.warningFileList;
 
     // Setup close handlers
     elements.closeHelpModal?.addEventListener('click', () => hideHelpModal());
@@ -120,6 +129,19 @@ export function initModals(elements) {
     passwordModal?.addEventListener('click', (e) => {
         if (e.target === passwordModal) hidePasswordModal(null);
     });
+
+    // Encryption Warning modal handlers
+    elements.cancelWarningBtn?.addEventListener('click', () => {
+        hideEncryptionWarningModal(false);
+    });
+
+    elements.proceedWarningBtn?.addEventListener('click', () => {
+        hideEncryptionWarningModal(true);
+    });
+
+    encryptionWarningModal?.addEventListener('click', (e) => {
+        if (e.target === encryptionWarningModal) hideEncryptionWarningModal(false);
+    });
 }
 
 // ============================================
@@ -175,6 +197,38 @@ function hidePasswordModal(password) {
     if (passwordResolve) {
         passwordResolve(password);
         passwordResolve = null;
+    }
+}
+
+// ============================================
+// Encryption Warning Modal
+// ============================================
+
+/**
+ * Show encryption warning modal
+ * @param {Array} files - List of password-protected files
+ * @returns {Promise<boolean>} - True to proceed, false to cancel
+ */
+export function showEncryptionWarningModal(files) {
+    return new Promise((resolve) => {
+        encryptionWarningResolve = resolve;
+
+        // Populate file list
+        if (warningFileList) {
+            warningFileList.innerHTML = files.map(f =>
+                `<div class="py-1 border-b border-gray-100 last:border-0 last:pb-0">• ${f.name}</div>`
+            ).join('');
+        }
+
+        encryptionWarningModal?.classList.remove('hidden');
+    });
+}
+
+function hideEncryptionWarningModal(proceed) {
+    encryptionWarningModal?.classList.add('hidden');
+    if (encryptionWarningResolve) {
+        encryptionWarningResolve(proceed);
+        encryptionWarningResolve = null;
     }
 }
 

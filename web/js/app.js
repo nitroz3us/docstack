@@ -62,6 +62,11 @@ export async function initApp() {
         togglePasswordVisibility: document.getElementById('togglePasswordVisibility'),
         eyeIcon: document.getElementById('eyeIcon'),
         eyeOffIcon: document.getElementById('eyeOffIcon'),
+        // Encryption warning modal elements
+        encryptionWarningModal: document.getElementById('encryptionWarningModal'),
+        warningFileList: document.getElementById('warningFileList'),
+        cancelWarningBtn: document.getElementById('cancelWarningBtn'),
+        proceedWarningBtn: document.getElementById('proceedWarningBtn'),
     };
 
     // Initialize modules

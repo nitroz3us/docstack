@@ -6,6 +6,7 @@
 
 import * as state from '../state.js';
 import { parseRules } from '../utils/helpers.js';
+import { showEncryptionWarningModal } from '../ui/modals.js';
 
 // pdf-lib reference (set during initialization)
 let PDFDocument = null;
@@ -111,8 +112,9 @@ async function loadPdfForMerge(arrayBuffer, password) {
         // If it fails due to encryption, try with ignoreEncryption
         // This handles owner-password-only PDFs (print/copy restrictions)
         if (error.message?.includes('encrypted')) {
-            console.log('PDF has owner restrictions, using ignoreEncryption');
-            return PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+            console.log('PDF has owner restrictions, fallback to image render');
+            // pdf-lib cannot decrypt content even with ignoreEncryption: true, so use the image-based fallback
+            return null;
         }
         throw error;
     }
@@ -126,16 +128,18 @@ async function loadPdfForMerge(arrayBuffer, password) {
 export async function mergePDFs(showLoading, hideLoading) {
     if (state.uploadedFiles.length === 0) return;
 
+    // Check if any files are password-protected
+    const passwordProtectedFiles = state.uploadedFiles.filter(f => isPasswordProtected(f));
+
+    if (passwordProtectedFiles.length > 0) {
+        const proceed = await showEncryptionWarningModal(passwordProtectedFiles);
+        if (!proceed) return;
+    }
+
     showLoading('Merging PDFs...');
 
     try {
         const mergedPdf = await PDFDocument.create();
-
-        // Check if any files are password-protected
-        const hasPasswordProtected = state.uploadedFiles.some(f => isPasswordProtected(f));
-        if (hasPasswordProtected) {
-            console.log('Some files are password-protected, will use image fallback for those');
-        }
 
         // If in "All Pages" mode and globalPageOrder is set, use that order
         if (state.currentView === 'allPages' && state.globalPageOrder.length > 0) {
