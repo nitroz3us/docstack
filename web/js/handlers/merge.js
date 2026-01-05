@@ -52,14 +52,14 @@ export async function mergePDFs(showLoading, hideLoading) {
                     if (!sourceFile) continue;
 
                     if (!docCache[importedPage.sourceFileId]) {
-                        docCache[importedPage.sourceFileId] = await PDFDocument.load(sourceFile.arrayBuffer);
+                        docCache[importedPage.sourceFileId] = await PDFDocument.load(sourceFile.arrayBuffer, { ignoreEncryption: true });
                     }
                     srcDoc = docCache[importedPage.sourceFileId];
                     actualPageIndex = importedPage.sourcePageIndex;
                 } else {
                     // Native page
                     if (!docCache[fileId]) {
-                        docCache[fileId] = await PDFDocument.load(file.arrayBuffer);
+                        docCache[fileId] = await PDFDocument.load(file.arrayBuffer, { ignoreEncryption: true });
                     }
 
                     srcDoc = docCache[fileId];
@@ -108,14 +108,14 @@ export async function mergePDFs(showLoading, hideLoading) {
                         if (!sourceFile) continue;
 
                         if (!docCache[importedPage.sourceFileId]) {
-                            docCache[importedPage.sourceFileId] = await PDFDocument.load(sourceFile.arrayBuffer);
+                            docCache[importedPage.sourceFileId] = await PDFDocument.load(sourceFile.arrayBuffer, { ignoreEncryption: true });
                         }
                         srcDoc = docCache[importedPage.sourceFileId];
                         actualPageIndex = importedPage.sourcePageIndex;
                     } else {
                         // Load from current file
                         if (!docCache[file.id]) {
-                            docCache[file.id] = await PDFDocument.load(file.arrayBuffer);
+                            docCache[file.id] = await PDFDocument.load(file.arrayBuffer, { ignoreEncryption: true });
                         }
                         srcDoc = docCache[file.id];
                         actualPageIndex = rule.page;
