@@ -15,6 +15,13 @@ let lightboxTitle = null;
 let prevPageBtn = null;
 let nextPageBtn = null;
 
+// Password modal references
+let passwordModal = null;
+let passwordInput = null;
+let passwordError = null;
+let passwordModalFileName = null;
+let passwordResolve = null; // Promise resolver for password modal
+
 /**
  * Initialize modals module with DOM references
  * @param {Object} elements - DOM element references
@@ -26,6 +33,12 @@ export function initModals(elements) {
     lightboxTitle = elements.lightboxTitle;
     prevPageBtn = elements.prevPageBtn;
     nextPageBtn = elements.nextPageBtn;
+
+    // Password modal references
+    passwordModal = elements.passwordModal;
+    passwordInput = elements.passwordInput;
+    passwordError = elements.passwordError;
+    passwordModalFileName = elements.passwordModalFileName;
 
     // Setup close handlers
     elements.closeHelpModal?.addEventListener('click', () => hideHelpModal());
@@ -57,6 +70,56 @@ export function initModals(elements) {
         if (e.key === 'ArrowRight') changeLightboxPage(1);
         if (e.key === 'Escape') hideLightbox();
     });
+
+    // Password modal handlers
+    elements.closePasswordModal?.addEventListener('click', () => {
+        hidePasswordModal(null);
+    });
+
+    elements.cancelPasswordBtn?.addEventListener('click', () => {
+        hidePasswordModal(null);
+    });
+
+    elements.submitPasswordBtn?.addEventListener('click', () => {
+        const password = passwordInput?.value;
+        if (password) {
+            hidePasswordModal(password);
+        }
+    });
+
+    // Enter key to submit password
+    passwordInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const password = passwordInput?.value;
+            if (password) {
+                hidePasswordModal(password);
+            }
+        }
+        if (e.key === 'Escape') {
+            hidePasswordModal(null);
+        }
+    });
+
+    // Toggle password visibility
+    elements.togglePasswordVisibility?.addEventListener('click', () => {
+        const eyeIcon = elements.eyeIcon;
+        const eyeOffIcon = elements.eyeOffIcon;
+
+        if (passwordInput?.type === 'password') {
+            passwordInput.type = 'text';
+            eyeIcon?.classList.add('hidden');
+            eyeOffIcon?.classList.remove('hidden');
+        } else {
+            passwordInput.type = 'password';
+            eyeIcon?.classList.remove('hidden');
+            eyeOffIcon?.classList.add('hidden');
+        }
+    });
+
+    // Click outside to cancel
+    passwordModal?.addEventListener('click', (e) => {
+        if (e.target === passwordModal) hidePasswordModal(null);
+    });
 }
 
 // ============================================
@@ -69,6 +132,50 @@ export function showHelpModal() {
 
 export function hideHelpModal() {
     helpModal?.classList.add('hidden');
+}
+
+// ============================================
+// Password Modal
+// ============================================
+
+/**
+ * Show password modal and wait for user input
+ * @param {string} fileName - Name of the file requiring password
+ * @param {boolean} [showError=false] - Whether to show error message
+ * @returns {Promise<string|null>} - Password or null if cancelled
+ */
+export function showPasswordModal(fileName, showError = false) {
+    return new Promise((resolve) => {
+        passwordResolve = resolve;
+
+        // Reset state
+        if (passwordInput) passwordInput.value = '';
+        if (passwordError) {
+            if (showError) {
+                passwordError.classList.remove('hidden');
+            } else {
+                passwordError.classList.add('hidden');
+            }
+        }
+        if (passwordModalFileName) {
+            passwordModalFileName.textContent = fileName;
+        }
+
+        passwordModal?.classList.remove('hidden');
+        passwordInput?.focus();
+    });
+}
+
+/**
+ * Hide password modal and resolve with result
+ * @param {string|null} password - Password or null if cancelled
+ */
+function hidePasswordModal(password) {
+    passwordModal?.classList.add('hidden');
+    if (passwordResolve) {
+        passwordResolve(password);
+        passwordResolve = null;
+    }
 }
 
 // ============================================

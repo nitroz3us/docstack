@@ -51,6 +51,17 @@ export async function initApp() {
         lightboxTitle: document.getElementById('lightboxTitle'),
         prevPageBtn: document.getElementById('prevPageBtn'),
         nextPageBtn: document.getElementById('nextPageBtn'),
+        // Password modal elements
+        passwordModal: document.getElementById('passwordModal'),
+        closePasswordModal: document.getElementById('closePasswordModal'),
+        passwordInput: document.getElementById('passwordInput'),
+        passwordError: document.getElementById('passwordError'),
+        passwordModalFileName: document.getElementById('passwordModalFileName'),
+        submitPasswordBtn: document.getElementById('submitPasswordBtn'),
+        cancelPasswordBtn: document.getElementById('cancelPasswordBtn'),
+        togglePasswordVisibility: document.getElementById('togglePasswordVisibility'),
+        eyeIcon: document.getElementById('eyeIcon'),
+        eyeOffIcon: document.getElementById('eyeOffIcon'),
     };
 
     // Initialize modules

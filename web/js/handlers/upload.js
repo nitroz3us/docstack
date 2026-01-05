@@ -9,6 +9,7 @@ import { generateId } from '../utils/helpers.js';
 import { loadPdfDocument, getPageCount } from '../utils/pdf.js';
 import { createLoadingCard } from '../ui/components.js';
 import { addFileCard, renderFileGrid, preparePagesViewDom, showRenderProgress } from '../ui/views.js';
+import { showPasswordModal } from '../ui/modals.js';
 
 // DOM element references
 let pdfList = null;
@@ -46,8 +47,38 @@ export async function handleFiles(fileList, handlers, updateUI) {
 
             const arrayBuffer = await file.arrayBuffer();
 
-            // Load for rendering (PDF.js) - CACHED PROXY
-            const pdfProxy = await loadPdfDocument(arrayBuffer);
+            // Load for rendering (PDF.js) - with password handling
+            let pdfProxy = null;
+            let password = null;
+            let showError = false;
+
+            while (!pdfProxy) {
+                try {
+                    pdfProxy = await loadPdfDocument(arrayBuffer, password);
+                } catch (loadError) {
+                    // Check if it's a password error
+                    if (loadError.name === 'PasswordException') {
+                        // Show password modal
+                        password = await showPasswordModal(file.name, showError);
+
+                        if (password === null) {
+                            // User cancelled - skip this file
+                            loadingCard.remove();
+                            break;
+                        }
+
+                        // Will show error on next attempt if password is wrong
+                        showError = true;
+                        continue;
+                    }
+
+                    // Not a password error - rethrow
+                    throw loadError;
+                }
+            }
+
+            // User cancelled password entry
+            if (!pdfProxy) continue;
 
             // Get pageCount directly from pdfProxy
             const pageCount = getPageCount(pdfProxy);
@@ -61,7 +92,8 @@ export async function handleFiles(fileList, handlers, updateUI) {
                 pageCount: pageCount,
                 rules: '',
                 pageRotations: Array(pageCount).fill(0),
-                pageOrder: Array.from({ length: pageCount }, (_, i) => i)
+                pageOrder: Array.from({ length: pageCount }, (_, i) => i),
+                password: password // Store password for merge operations
             };
 
             // Add to state

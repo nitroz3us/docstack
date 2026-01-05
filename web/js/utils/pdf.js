@@ -45,15 +45,23 @@ export async function renderPdfPage(pdfDoc, pageNum, canvas, scale = 0.5) {
 /**
  * Load a PDF document from ArrayBuffer
  * @param {ArrayBuffer} arrayBuffer - PDF file data
+ * @param {string} [password] - Optional password for encrypted PDFs
  * @returns {Promise<Object>} - PDF.js document proxy
  */
-export async function loadPdfDocument(arrayBuffer) {
+export async function loadPdfDocument(arrayBuffer, password = null) {
     if (!pdfjsLib) {
         throw new Error('PDF.js library not initialized');
     }
 
     // Create a copy of the buffer to avoid detached buffer issues
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
+    const loadingParams = { data: arrayBuffer.slice(0) };
+
+    // Add password if provided
+    if (password) {
+        loadingParams.password = password;
+    }
+
+    const loadingTask = pdfjsLib.getDocument(loadingParams);
     return loadingTask.promise;
 }
 

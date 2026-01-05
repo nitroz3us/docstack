@@ -36,6 +36,7 @@ export function on(type, handler) {
  *   rules: string,
  *   pageRotations: number[],
  *   pageOrder: number[],
+ *   password?: string,
  *   importedPages?: Array<{newIndex: number, sourceFileId: string, sourcePageIndex: number}>
  * }>}
  */
