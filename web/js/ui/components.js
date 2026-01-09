@@ -61,20 +61,20 @@ export function createPageThumb({ file, pageIndex, view, globalIndex, onPreview,
                     <div class="w-6 h-6 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin"></div>
                 </div>
             </div>
-            <div class="absolute top-1 right-1 flex gap-1">
-                <button class="preview-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-blue-50 hover:shadow" title="Preview">
-                    <svg class="w-4 h-4 text-gray-500 hover:text-blue-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="absolute top-0 left-0 right-0 bg-gray-100/95 backdrop-blur-sm py-1.5 flex justify-center gap-1.5 sm:gap-1 border-b border-gray-100">
+                <button class="preview-page-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-blue-50 rounded-full flex items-center justify-center transition-all" title="Preview">
+                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                 </button>
-                <button class="rotate-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-100 hover:shadow" title="Rotate 90°">
-                    <svg class="w-4 h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button class="rotate-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-gray-100 rounded-full flex items-center justify-center transition-all" title="Rotate 90°">
+                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                 </button>
-                <button class="delete-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-red-50 hover:shadow" title="Delete page">
-                    <svg class="w-4 h-4 text-gray-500 hover:text-red-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button class="delete-page-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-red-50 rounded-full flex items-center justify-center transition-all" title="Delete page">
+                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 hover:text-red-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
@@ -95,20 +95,20 @@ export function createPageThumb({ file, pageIndex, view, globalIndex, onPreview,
                     <div class="w-6 h-6 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin"></div>
                 </div>
             </div>
-            <div class="absolute top-1 right-1 flex gap-1">
-                <button class="preview-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-blue-50 hover:shadow" title="Preview">
-                    <svg class="w-4 h-4 text-gray-500 hover:text-blue-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="absolute top-0 left-0 right-0 bg-gray-100/95 backdrop-blur-sm py-1.5 flex justify-center gap-1.5 sm:gap-1 border-b border-gray-100">
+                <button class="preview-page-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-blue-50 rounded-full flex items-center justify-center transition-all" title="Preview">
+                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                 </button>
-                <button class="rotate-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-100 hover:shadow" title="Rotate 90°">
-                    <svg class="w-4 h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button class="rotate-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-gray-100 rounded-full flex items-center justify-center transition-all" title="Rotate 90°">
+                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                 </button>
-                <button class="delete-page-btn w-7 h-7 bg-white/95 rounded-full flex items-center justify-center shadow-sm hover:bg-red-50 hover:shadow" title="Delete page">
-                    <svg class="w-4 h-4 text-gray-500 hover:text-red-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button class="delete-page-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-red-50 rounded-full flex items-center justify-center transition-all" title="Delete page">
+                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 hover:text-red-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
@@ -194,9 +194,9 @@ export function createFileCard(file, handlers = {}) {
         </div>
         
         <!-- Expanded Pages (hidden by default) -->
-        <div class="pages-panel hidden border-t border-gray-100 bg-gray-50 p-4">
+        <div class="pages-panel hidden border-t border-gray-100 bg-gray-50 p-3 sm:p-4">
             <p class="text-xs text-gray-400 mb-3 text-center">Drag to reorder • Click icons to preview, rotate, or delete</p>
-            <div class="pages-grid grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+            <div class="pages-grid grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-3">
                 <!-- Page thumbnails will be inserted here -->
             </div>
         </div>
