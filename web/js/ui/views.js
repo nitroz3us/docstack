@@ -347,6 +347,9 @@ export function toggleFileExpand(fileId, card, handlers) {
                 group: 'shared-pages',
                 animation: 150,
                 filter: 'button, .preview-page-btn, .rotate-btn, .delete-page-btn',
+                preventOnFilter: false,
+                delay: 150,
+                delayOnTouchOnly: true,
                 onEnd: (evt) => {
                     handlers.onCrossFileDrag?.(evt, fileId);
                 }
@@ -445,6 +448,9 @@ export function preparePagesViewDom(handlers) {
             ghostClass: 'sortable-ghost',
             chosenClass: 'sortable-chosen',
             filter: 'button, .preview-page-btn, .rotate-btn, .delete-page-btn',
+            preventOnFilter: false,
+            delay: 150,
+            delayOnTouchOnly: true,
             onEnd: (evt) => {
                 const thumbs = Array.from(allPagesGrid.querySelectorAll('.page-thumb'));
                 const newOrder = thumbs.map(el => ({

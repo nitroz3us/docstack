@@ -14,3 +14,18 @@
 .sortable-chosen {
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
 }
+
+/* Mobile touch fix - remove tap delay and ensure proper touch handling */
+.page-thumb button,
+.preview-page-btn,
+.rotate-btn,
+.delete-page-btn {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+}
+
+/* Ensure buttons are above other elements for touch */
+.page-thumb .absolute {
+    z-index: 10;
+}
