@@ -76,17 +76,3 @@ export function getFileHue(index) {
     // Start at Blue (210deg), use golden angle approx (137.5 deg) for distribution
     return ((index * 137.508) + 210) % 360;
 }
-
-/**
- * Create a debounced function
- * @param {Function} fn 
- * @param {number} delay 
- * @returns {Function}
- */
-export function debounce(fn, delay) {
-    let timeoutId;
-    return (...args) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => fn(...args), delay);
-    };
-}

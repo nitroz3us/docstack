@@ -5,8 +5,8 @@
  */
 
 import * as state from './state.js';
-import { initPdfLib, renderPdfPage } from './utils/pdf.js';
-import { initViews, addFileCard, toggleFileExpand, switchView, renderFileGrid, syncPagesViewOrder, updatePageIdentity } from './ui/views.js';
+import { initPdfLib } from './utils/pdf.js';
+import { initViews, toggleFileExpand, switchView, syncPagesViewOrder, updatePageIdentity } from './ui/views.js';
 import { initModals, showHelpModal, showPageLightbox } from './ui/modals.js';
 
 import { initUploadHandler, handleFiles } from './handlers/upload.js';
@@ -67,6 +67,15 @@ export async function initApp() {
         warningFileList: document.getElementById('warningFileList'),
         cancelWarningBtn: document.getElementById('cancelWarningBtn'),
         proceedWarningBtn: document.getElementById('proceedWarningBtn'),
+        // Redaction elements
+        lightboxContent: document.getElementById('lightboxContent'),
+        redactionCanvas: document.getElementById('redactionCanvas'),
+        redactModeBtn: document.getElementById('redactModeBtn'),
+        clearRedactionsBtn: document.getElementById('clearRedactionsBtn'),
+        // Redaction warning modal
+        redactionWarningModal: document.getElementById('redactionWarningModal'),
+        cancelRedactionBtn: document.getElementById('cancelRedactionBtn'),
+        proceedRedactionBtn: document.getElementById('proceedRedactionBtn'),
     };
 
     // Initialize modules
@@ -164,7 +173,7 @@ export async function initApp() {
 // UI Update Functions
 // ============================================
 
-function updateUI(elements, skipPagesRender = false) {
+function updateUI(elements) {
     const hasFiles = state.hasFiles();
 
     if (hasFiles) {
@@ -268,8 +277,6 @@ function handleCrossFileDrag(evt, sourceFileId) {
     // Update thumb element's data attributes (CRITICAL: update file ID!)
     evt.item.dataset.pageIndex = newPageIndex;
     evt.item.dataset.fileId = targetFileId;
-    evt.item.dataset.sourceFileId = sourceFileId;
-    evt.item.dataset.sourcePageIndex = pageIndex;
 
     // Remove from source pageOrder
     sourceFile.pageOrder = sourceFile.pageOrder.filter(idx => idx !== pageIndex);

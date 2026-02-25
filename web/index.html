@@ -145,27 +145,45 @@
             <div class="absolute bottom-0 right-0 left-0 flex items-center justify-center p-4 z-20 pointer-events-none">
                 <span id="lightboxTitle" class="text-sm font-medium text-white/90 drop-shadow-md truncate max-w-[70%] bg-black/40 px-4 py-1.5 rounded-full backdrop-blur-sm pointer-events-auto text-center"></span>
             </div>
-            <button id="closeLightbox" class="absolute top-4 right-4 z-20 text-white/70 hover:text-white transition-colors bg-black/20 hover:bg-black/40 rounded-full p-2 backdrop-blur-md">
+            <button id="closeLightbox" class="absolute top-4 right-4 z-20 text-white hover:text-white transition-colors bg-black/50 hover:bg-black/80 rounded-full p-2 backdrop-blur-sm">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
 
             <!-- Navigation Buttons -->
-            <button id="prevPageBtn" class="absolute left-4 top-1/2 -translate-y-1/2 z-20 text-white/50 hover:text-white transition-colors p-2 hover:bg-black/20 rounded-full hidden">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button id="prevPageBtn" class="absolute left-2 top-1/2 -translate-y-1/2 z-20 text-white hover:text-white transition-colors p-2 bg-black/50 hover:bg-black/80 rounded-full hidden backdrop-blur-sm">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                 </svg>
             </button>
-            <button id="nextPageBtn" class="absolute right-4 top-1/2 -translate-y-1/2 z-20 text-white/50 hover:text-white transition-colors p-2 hover:bg-black/20 rounded-full hidden">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button id="nextPageBtn" class="absolute right-2 top-1/2 -translate-y-1/2 z-20 text-white hover:text-white transition-colors p-2 bg-black/50 hover:bg-black/80 rounded-full hidden backdrop-blur-sm">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
             </button>
 
-            <!-- Content -->
-            <div class="flex items-center justify-center w-full h-full overflow-hidden p-2 relative">
-                <canvas id="lightboxCanvas" class="max-w-full max-h-full object-contain shadow-2xl transition-all duration-150"></canvas>
+            <!-- Content: px-14 reserves ~56px on each side so the canvas never reaches the arrow zones -->
+            <div class="flex items-center justify-center w-full h-full overflow-hidden px-14 py-2 relative" id="lightboxContent">
+                <canvas id="lightboxCanvas" class="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-150"></canvas>
+                <!-- Redaction canvas overlay (same size as lightboxCanvas, positioned on top) -->
+                <canvas id="redactionCanvas" class="absolute pointer-events-none"></canvas>
+            </div>
+
+            <!-- Redaction Toolbar (Top Left) -->
+            <div class="absolute top-4 left-4 z-20 flex gap-2">
+                <button id="redactModeBtn" class="text-white transition-colors bg-red-600/80 hover:bg-red-500 rounded-full px-4 py-2 backdrop-blur-md flex items-center gap-2 text-sm font-semibold shadow-lg shadow-red-900/40 ring-1 ring-red-400/40">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    <span>Redact</span>
+                </button>
+                <button id="clearRedactionsBtn" class="hidden text-white/70 hover:text-red-400 transition-colors bg-black/20 hover:bg-black/40 rounded-full px-4 py-2 backdrop-blur-md flex items-center gap-2 text-sm font-medium">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Clear</span>
+                </button>
             </div>
         </div>
     </div>
@@ -248,6 +266,45 @@
                     </button>
                     <button id="proceedWarningBtn" class="flex-1 py-2.5 px-4 bg-gray-900 text-white rounded-lg text-base font-medium hover:bg-gray-800 transition-colors">
                         Merge Anyway
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Redaction Warning Modal -->
+    <div id="redactionWarningModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4 sm:p-6">
+        <div class="bg-white rounded-lg max-w-md w-full overflow-hidden shadow-xl mx-2">
+            <div class="flex items-center justify-between p-3 sm:p-4 border-b border-gray-100">
+                <h3 class="text-base sm:text-lg font-medium text-gray-900 flex items-center gap-2">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    Redaction Mode
+                </h3>
+            </div>
+            <div class="p-4 sm:p-6">
+                <p class="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4">You are about to enter redaction mode.</p>
+                
+                <div class="bg-amber-50 border border-amber-100 rounded-lg p-3 sm:p-4 mb-4 sm:mb-5">
+                    <h4 class="text-xs sm:text-sm font-semibold text-amber-800 mb-2">⚠️ Important:</h4>
+                    <ul class="text-xs sm:text-sm text-amber-700 space-y-1 sm:space-y-1.5 list-disc list-inside">
+                        <li>Redacted pages will be converted to images</li>
+                        <li>Text on those pages will <strong>NOT</strong> be selectable</li>
+                        <li>Search won't find text on those pages</li>
+                    </ul>
+                </div>
+
+                <p class="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
+                    This ensures the redacted content cannot be recovered or extracted.
+                </p>
+
+                <div class="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+                    <button id="cancelRedactionBtn" class="flex-1 py-2.5 px-4 border border-gray-300 rounded-lg text-sm sm:text-base font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                        Cancel
+                    </button>
+                    <button id="proceedRedactionBtn" class="flex-1 py-2.5 px-4 bg-red-600 text-white rounded-lg text-sm sm:text-base font-medium hover:bg-red-700 active:bg-red-800 transition-colors">
+                        Enter Redact Mode
                     </button>
                 </div>
             </div>

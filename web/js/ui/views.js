@@ -58,8 +58,6 @@ function performCrossFileImport(thumb, sourceFileId, targetFileId) {
     const oldPageIndex = pageIndex;
     thumb.dataset.pageIndex = newPageIndex;
     thumb.dataset.fileId = targetFileId;
-    thumb.dataset.sourceFileId = sourceFileId;
-    thumb.dataset.sourcePageIndex = oldPageIndex;
 
     // Update label text
     const label = thumb.lastElementChild;
@@ -142,7 +140,6 @@ function performCrossFileImport(thumb, sourceFileId, targetFileId) {
                         if (pagesWrapper) pagesWrapper.style.transform = `rotate(${rotation}deg)`;
                     }
 
-                    state.emit('page:rotated', { fileId: targetFileId, pageIndex: newPageIndex, rotation });
                 });
             }
 
@@ -199,7 +196,7 @@ function updateMergeButton(isProcessing) {
  * @param {Object} handlers - Event handlers
  */
 export function addFileCard(file, handlers) {
-    const card = createFileCard(file, handlers);
+    const card = createFileCard(file);
 
     // Attach event listeners
     card.querySelector('.card-header').addEventListener('click', () => {
@@ -262,7 +259,6 @@ export function renderFileGrid(file, grid, handlers) {
                     wrapper.style.transform = `rotate(${f.pageRotations[pi]}deg)`;
                 }
 
-                state.emit('page:rotated', { fileId: f.id, pageIndex: pi, rotation: f.pageRotations[pi] });
             }
         });
 
@@ -358,17 +354,16 @@ export function toggleFileExpand(fileId, card, handlers) {
         }
 
         // Setup delegated delete handler if not already done
-        setupFilesViewDeleteHandler(grid, file, handlers);
+        setupFilesViewDeleteHandler(grid, handlers);
     }
 }
 
 /**
  * Setup delegated delete handler for a Files view page grid
  * @param {HTMLElement} grid - The pages-grid element
- * @param {Object} file - The file object
  * @param {Object} handlers - Event handlers
  */
-function setupFilesViewDeleteHandler(grid, file, handlers) {
+function setupFilesViewDeleteHandler(grid, handlers) {
     if (grid.dataset.hasDeleteListener) return;
 
     grid.addEventListener('click', (e) => {
@@ -522,7 +517,7 @@ function startProgressiveRendering(pagesToRender, handlers) {
         pagesToRender.forEach((item, idx) => {
             const file = state.getFile(item.fileId);
             if (!file) return;
-            const thumb = createProgressiveThumb(file, item.pageIndex, handlers, idx);
+            const thumb = createProgressiveThumb(file, item.pageIndex, handlers);
             allPagesGrid.appendChild(thumb);
         });
         return;
@@ -612,7 +607,7 @@ function startProgressiveRendering(pagesToRender, handlers) {
             return;
         }
 
-        const thumb = createProgressiveThumb(file, pageIndex, handlers, currentIndex);
+        const thumb = createProgressiveThumb(file, pageIndex, handlers);
         allPagesGrid.appendChild(thumb);
 
         const canvas = thumb.querySelector('canvas');
@@ -717,12 +712,11 @@ function startProgressiveRendering(pagesToRender, handlers) {
 /**
  * Create a page thumb for progressive rendering
  */
-function createProgressiveThumb(file, pageIndex, handlers, globalIndex) {
+function createProgressiveThumb(file, pageIndex, handlers) {
     return createPageThumb({
         file,
         pageIndex,
         view: 'pages',
-        globalIndex,
         onPreview: handlers.onPreview,
         onRotate: (f, pi, el) => {
             f.pageRotations[pi] = (f.pageRotations[pi] + 90) % 360;
@@ -738,7 +732,6 @@ function createProgressiveThumb(file, pageIndex, handlers, globalIndex) {
                     if (label) label.textContent = f.pageRotations[pi] > 0 ? f.pageRotations[pi] + '°' : '';
                 }
             }
-            state.emit('page:rotated', { fileId: f.id, pageIndex: pi, rotation: f.pageRotations[pi] });
         }
     });
 }
@@ -965,4 +958,3 @@ export function syncFilesViewOrder() {
         grid.appendChild(fragment);
     });
 }
-

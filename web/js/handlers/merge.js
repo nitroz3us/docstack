@@ -35,9 +35,10 @@ function isPasswordProtected(file) {
  * @param {Object} pdfProxy - PDF.js document proxy
  * @param {number} pageNum - 1-indexed page number
  * @param {number} rotation - Rotation in degrees
+ * @param {Array} redactions - Optional array of redaction rectangles to draw
  * @returns {Promise<{data: Uint8Array, width: number, height: number}>}
  */
-async function renderPageAsImage(pdfProxy, pageNum, rotation = 0) {
+async function renderPageAsImage(pdfProxy, pageNum, rotation = 0, redactions = []) {
     const page = await pdfProxy.getPage(pageNum);
 
     // Use higher scale for better quality
@@ -56,6 +57,24 @@ async function renderPageAsImage(pdfProxy, pageNum, rotation = 0) {
 
     // Render the page
     await page.render({ canvasContext: ctx, viewport }).promise;
+
+    // Draw redactions on the rendered image (true redaction - text is gone)
+    if (redactions && redactions.length > 0) {
+        ctx.fillStyle = 'black';
+        for (const rect of redactions) {
+            // Scale redaction coordinates from lightbox canvas to render canvas
+            // The redaction was drawn on a 1.5x scale lightbox, we're rendering at 2.0x
+            const scaleX = viewport.width / rect.canvasWidth;
+            const scaleY = viewport.height / rect.canvasHeight;
+
+            ctx.fillRect(
+                rect.x * scaleX,
+                rect.y * scaleY,
+                rect.width * scaleX,
+                rect.height * scaleY
+            );
+        }
+    }
 
     // Get image data as JPEG (smaller than PNG)
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
@@ -205,10 +224,14 @@ export async function mergePDFs(showLoading, hideLoading) {
 
                 const rotation = file.pageRotations[pageIndex] || 0;
 
-                // Check if source file is password-protected
-                if (isPasswordProtected(srcFile)) {
-                    // Use image-based rendering via PDF.js (which can decrypt)
-                    const imageData = await renderPageAsImage(srcFile.pdfProxy, actualPageIndex + 1, rotation);
+                // Check for redactions on this page
+                const redactions = state.getRedactions(fileId, pageIndex);
+                const hasRedactions = redactions && redactions.length > 0;
+
+                // Check if source file is password-protected OR has redactions
+                if (isPasswordProtected(srcFile) || hasRedactions) {
+                    // Use image-based rendering (true redaction - text is removed)
+                    const imageData = await renderPageAsImage(srcFile.pdfProxy, actualPageIndex + 1, rotation, redactions);
                     await addImagePage(mergedPdf, imageData.data, imageData.width, imageData.height);
                 } else {
                     // Use normal pdf-lib copy
@@ -267,10 +290,14 @@ export async function mergePDFs(showLoading, hideLoading) {
                     const visualRotation = file.pageRotations[rule.page] || 0;
                     const totalRotation = rule.rotation + visualRotation;
 
-                    // Check if source file is password-protected
-                    if (isPasswordProtected(srcFile)) {
-                        // Use image-based rendering via PDF.js (which can decrypt)
-                        const imageData = await renderPageAsImage(srcFile.pdfProxy, actualPageIndex + 1, totalRotation);
+                    // Check for redactions on this page
+                    const redactions = state.getRedactions(file.id, rule.page);
+                    const hasRedactions = redactions && redactions.length > 0;
+
+                    // Check if source file is password-protected OR has redactions
+                    if (isPasswordProtected(srcFile) || hasRedactions) {
+                        // Use image-based rendering (true redaction - text is removed)
+                        const imageData = await renderPageAsImage(srcFile.pdfProxy, actualPageIndex + 1, totalRotation, redactions);
                         await addImagePage(mergedPdf, imageData.data, imageData.width, imageData.height);
                     } else {
                         // Use normal pdf-lib copy

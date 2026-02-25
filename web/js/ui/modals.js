@@ -11,6 +11,7 @@ import { renderPdfPage } from '../utils/pdf.js';
 let helpModal = null;
 let pageLightbox = null;
 let lightboxCanvas = null;
+let offscreenCanvas = null;
 let lightboxTitle = null;
 let prevPageBtn = null;
 let nextPageBtn = null;
@@ -27,6 +28,22 @@ let encryptionWarningModal = null;
 let warningFileList = null;
 let encryptionWarningResolve = null;
 
+// Redaction references
+let lightboxContent = null;
+let redactionCanvas = null;
+let redactionCtx = null;
+let redactModeBtn = null;
+let clearRedactionsBtn = null;
+
+// Redaction warning modal
+let redactionWarningModal = null;
+let redactionWarningResolve = null;
+
+// Redaction state
+let isRedactMode = false;
+let isDrawing = false;
+let drawStart = { x: 0, y: 0 };
+
 /**
  * Initialize modals module with DOM references
  * @param {Object} elements - DOM element references
@@ -35,6 +52,7 @@ export function initModals(elements) {
     helpModal = elements.helpModal;
     pageLightbox = elements.pageLightbox;
     lightboxCanvas = elements.lightboxCanvas;
+    offscreenCanvas = document.createElement('canvas');
     lightboxTitle = elements.lightboxTitle;
     prevPageBtn = elements.prevPageBtn;
     nextPageBtn = elements.nextPageBtn;
@@ -48,6 +66,18 @@ export function initModals(elements) {
     // Encryption Warning modal references
     encryptionWarningModal = elements.encryptionWarningModal;
     warningFileList = elements.warningFileList;
+
+    // Redaction references
+    lightboxContent = elements.lightboxContent;
+    redactionCanvas = elements.redactionCanvas;
+    if (redactionCanvas) {
+        redactionCtx = redactionCanvas.getContext('2d');
+    }
+    redactModeBtn = elements.redactModeBtn;
+    clearRedactionsBtn = elements.clearRedactionsBtn;
+
+    // Redaction warning modal
+    redactionWarningModal = elements.redactionWarningModal;
 
     // Setup close handlers
     elements.closeHelpModal?.addEventListener('click', () => hideHelpModal());
@@ -142,6 +172,46 @@ export function initModals(elements) {
     encryptionWarningModal?.addEventListener('click', (e) => {
         if (e.target === encryptionWarningModal) hideEncryptionWarningModal(false);
     });
+
+    // ============================================
+    // Redaction Mode Handlers
+    // ============================================
+
+    // Toggle redact mode
+    redactModeBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleRedactMode();
+    });
+
+    // Clear redactions for current page
+    clearRedactionsBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearCurrentPageRedactions();
+    });
+
+    // Mouse events for drawing redaction rectangles
+    lightboxContent?.addEventListener('mousedown', handleDrawStart);
+    lightboxContent?.addEventListener('mousemove', handleDrawMove);
+    lightboxContent?.addEventListener('mouseup', handleDrawEnd);
+    lightboxContent?.addEventListener('mouseleave', handleDrawEnd);
+
+    // Touch events for mobile
+    lightboxContent?.addEventListener('touchstart', handleTouchStart, { passive: false });
+    lightboxContent?.addEventListener('touchmove', handleTouchMove, { passive: false });
+    lightboxContent?.addEventListener('touchend', handleTouchEnd);
+
+    // Redaction warning modal handlers
+    elements.cancelRedactionBtn?.addEventListener('click', () => {
+        hideRedactionWarningModal(false);
+    });
+
+    elements.proceedRedactionBtn?.addEventListener('click', () => {
+        hideRedactionWarningModal(true);
+    });
+
+    redactionWarningModal?.addEventListener('click', (e) => {
+        if (e.target === redactionWarningModal) hideRedactionWarningModal(false);
+    });
 }
 
 // ============================================
@@ -233,6 +303,29 @@ function hideEncryptionWarningModal(proceed) {
 }
 
 // ============================================
+// Redaction Warning Modal
+// ============================================
+
+/**
+ * Show redaction warning modal
+ * @returns {Promise<boolean>} - True to proceed, false to cancel
+ */
+function showRedactionWarningModal() {
+    return new Promise((resolve) => {
+        redactionWarningResolve = resolve;
+        redactionWarningModal?.classList.remove('hidden');
+    });
+}
+
+function hideRedactionWarningModal(proceed) {
+    redactionWarningModal?.classList.add('hidden');
+    if (redactionWarningResolve) {
+        redactionWarningResolve(proceed);
+        redactionWarningResolve = null;
+    }
+}
+
+// ============================================
 // Page Lightbox
 // ============================================
 
@@ -254,9 +347,8 @@ export function hideLightbox() {
 
 /**
  * Render current lightbox page
- * @param {boolean} animate - Whether to animate transition
  */
-async function renderLightboxPage(animate = false) {
+async function renderLightboxPage() {
     const { fileId, orderIndex } = state.lightboxState;
     const file = state.getFile(fileId);
     if (!file) return;
@@ -267,33 +359,31 @@ async function renderLightboxPage(animate = false) {
 
     lightboxTitle.textContent = `${file.name} - Page ${pageNum}`;
 
-    // Fade out before rendering (for navigation transitions)
-    if (animate) {
-        lightboxCanvas.style.opacity = '0';
-        await new Promise(r => setTimeout(r, 100));
-    }
-
-    // Check if this is an imported page
+    // Render to offscreen canvas while old page stays visible
     const importedPage = file.importedPages?.find(p => p.newIndex === pageIndex);
 
     if (importedPage) {
         // Render from source file
         const sourceFile = state.getFile(importedPage.sourceFileId);
         if (sourceFile) {
-            await renderPdfPage(sourceFile.pdfProxy, importedPage.sourcePageIndex + 1, lightboxCanvas, 1.5);
+            await renderPdfPage(sourceFile.pdfProxy, importedPage.sourcePageIndex + 1, offscreenCanvas, 1.5);
         }
     } else {
         // Render at higher resolution for lightbox
-        await renderPdfPage(file.pdfProxy, pageNum, lightboxCanvas, 1.5);
+        await renderPdfPage(file.pdfProxy, pageNum, offscreenCanvas, 1.5);
     }
+
+    // Atomic swap: copy rendered result to visible canvas in one frame
+    lightboxCanvas.width = offscreenCanvas.width;
+    lightboxCanvas.height = offscreenCanvas.height;
+    lightboxCanvas.getContext('2d').drawImage(offscreenCanvas, 0, 0);
 
     // Apply rotation via CSS
     lightboxCanvas.style.transform = rotation ? `rotate(${rotation}deg)` : '';
 
-    // Fade back in
-    if (animate) {
-        lightboxCanvas.style.opacity = '1';
-    }
+    // Render any existing redactions on overlay
+    // Use setTimeout to ensure canvas is laid out
+    setTimeout(() => renderRedactionOverlay(), 50);
 
     // Update Navigation Buttons
     if (orderIndex > 0) {
@@ -321,6 +411,244 @@ async function changeLightboxPage(delta) {
     const newIndex = orderIndex + delta;
     if (newIndex < 0 || newIndex >= file.pageOrder.length) return;
 
+    // Exit redact mode when changing pages
+    if (isRedactMode) toggleRedactMode();
+
     state.setLightboxState(fileId, newIndex);
-    await renderLightboxPage(true);
+    await renderLightboxPage();
+}
+
+// ============================================
+// Redaction Functions
+// ============================================
+
+/**
+ * Toggle redaction mode on/off
+ */
+async function toggleRedactMode() {
+    if (!isRedactMode) {
+        // Show styled warning modal before entering redact mode
+        const confirmed = await showRedactionWarningModal();
+        if (!confirmed) return;
+    }
+
+    isRedactMode = !isRedactMode;
+
+    if (isRedactMode) {
+        // Activate redact mode
+        redactModeBtn?.classList.add('bg-red-400', 'ring-2', 'ring-white/60');
+        redactModeBtn?.classList.remove('bg-red-600/80');
+        redactModeBtn.querySelector('span').textContent = 'Drawing...';
+
+        // Show clear button if there are existing redactions
+        updateClearButtonVisibility();
+
+        // Change cursor and enable drawing on redaction canvas
+        if (redactionCanvas) {
+            redactionCanvas.classList.remove('pointer-events-none');
+            redactionCanvas.style.cursor = 'crosshair';
+        }
+        if (lightboxContent) {
+            lightboxContent.style.cursor = 'crosshair';
+        }
+    } else {
+        // Deactivate redact mode
+        redactModeBtn?.classList.remove('bg-red-400', 'ring-2', 'ring-white/60');
+        redactModeBtn?.classList.add('bg-red-600/80');
+        redactModeBtn.querySelector('span').textContent = 'Redact';
+
+        // Hide clear button
+        clearRedactionsBtn?.classList.add('hidden');
+
+        // Reset cursor
+        if (redactionCanvas) {
+            redactionCanvas.classList.add('pointer-events-none');
+            redactionCanvas.style.cursor = '';
+        }
+        if (lightboxContent) {
+            lightboxContent.style.cursor = '';
+        }
+    }
+}
+
+/**
+ * Update clear button visibility based on existing redactions
+ */
+function updateClearButtonVisibility() {
+    const { fileId, orderIndex } = state.lightboxState;
+    const file = state.getFile(fileId);
+    if (!file) return;
+
+    const pageIndex = file.pageOrder[orderIndex];
+    const redactions = state.getRedactions(fileId, pageIndex);
+
+    if (redactions.length > 0 && isRedactMode) {
+        clearRedactionsBtn?.classList.remove('hidden');
+    } else {
+        clearRedactionsBtn?.classList.add('hidden');
+    }
+}
+
+/**
+ * Clear redactions for the current page
+ */
+function clearCurrentPageRedactions() {
+    const { fileId, orderIndex } = state.lightboxState;
+    const file = state.getFile(fileId);
+    if (!file) return;
+
+    const pageIndex = file.pageOrder[orderIndex];
+    state.clearRedactions(fileId, pageIndex);
+
+    // Redraw (clear) the redaction canvas
+    renderRedactionOverlay();
+    updateClearButtonVisibility();
+}
+
+/**
+ * Position and size redaction canvas to match lightbox canvas
+ */
+function syncRedactionCanvas() {
+    if (!redactionCanvas || !lightboxCanvas) return;
+
+    const rect = lightboxCanvas.getBoundingClientRect();
+    const contentRect = lightboxContent.getBoundingClientRect();
+
+    // Match the visual size
+    redactionCanvas.style.width = rect.width + 'px';
+    redactionCanvas.style.height = rect.height + 'px';
+    redactionCanvas.style.left = (rect.left - contentRect.left) + 'px';
+    redactionCanvas.style.top = (rect.top - contentRect.top) + 'px';
+
+    // Set canvas internal resolution to match
+    redactionCanvas.width = rect.width;
+    redactionCanvas.height = rect.height;
+}
+
+/**
+ * Render existing redactions on the overlay canvas
+ */
+function renderRedactionOverlay() {
+    if (!redactionCtx || !lightboxCanvas) return;
+
+    syncRedactionCanvas();
+
+    const { fileId, orderIndex } = state.lightboxState;
+    const file = state.getFile(fileId);
+    if (!file) return;
+
+    const pageIndex = file.pageOrder[orderIndex];
+    const redactions = state.getRedactions(fileId, pageIndex);
+
+    // Clear canvas
+    redactionCtx.clearRect(0, 0, redactionCanvas.width, redactionCanvas.height);
+
+    // Draw all existing redactions
+    redactionCtx.fillStyle = 'black';
+    for (const rect of redactions) {
+        redactionCtx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    }
+}
+
+/**
+ * Get canvas-relative coordinates from event
+ */
+function getCanvasCoords(e) {
+    if (!lightboxCanvas) return { x: 0, y: 0 };
+
+    const rect = lightboxCanvas.getBoundingClientRect();
+    const clientX = e.clientX ?? e.touches?.[0]?.clientX ?? 0;
+    const clientY = e.clientY ?? e.touches?.[0]?.clientY ?? 0;
+
+    return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+    };
+}
+
+// Mouse event handlers
+function handleDrawStart(e) {
+    if (!isRedactMode) return;
+    // Check if click is on the canvas area
+    const rect = lightboxCanvas?.getBoundingClientRect();
+    if (!rect) return;
+
+    if (e.clientX < rect.left || e.clientX > rect.right ||
+        e.clientY < rect.top || e.clientY > rect.bottom) return;
+
+    isDrawing = true;
+    drawStart = getCanvasCoords(e);
+}
+
+function handleDrawMove(e) {
+    if (!isRedactMode || !isDrawing) return;
+
+    const current = getCanvasCoords(e);
+
+    // Re-render existing redactions
+    renderRedactionOverlay();
+
+    // Draw preview rectangle
+    redactionCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    redactionCtx.strokeStyle = 'red';
+    redactionCtx.lineWidth = 2;
+
+    const x = Math.min(drawStart.x, current.x);
+    const y = Math.min(drawStart.y, current.y);
+    const width = Math.abs(current.x - drawStart.x);
+    const height = Math.abs(current.y - drawStart.y);
+
+    redactionCtx.fillRect(x, y, width, height);
+    redactionCtx.strokeRect(x, y, width, height);
+}
+
+function handleDrawEnd(e) {
+    if (!isRedactMode || !isDrawing) return;
+    isDrawing = false;
+
+    const current = getCanvasCoords(e);
+
+    const x = Math.min(drawStart.x, current.x);
+    const y = Math.min(drawStart.y, current.y);
+    const width = Math.abs(current.x - drawStart.x);
+    const height = Math.abs(current.y - drawStart.y);
+
+    // Only save if rectangle has meaningful size
+    if (width > 5 && height > 5) {
+        const { fileId, orderIndex } = state.lightboxState;
+        const file = state.getFile(fileId);
+        if (file) {
+            const pageIndex = file.pageOrder[orderIndex];
+
+            // Store with canvas dimensions for later coordinate conversion
+            state.addRedaction(fileId, pageIndex, {
+                x, y, width, height,
+                canvasWidth: redactionCanvas.width,
+                canvasHeight: redactionCanvas.height
+            });
+        }
+    }
+
+    // Render final state
+    renderRedactionOverlay();
+    updateClearButtonVisibility();
+}
+
+// Touch event handlers (wrap mouse handlers)
+function handleTouchStart(e) {
+    if (!isRedactMode) return;
+    e.preventDefault();
+    handleDrawStart(e.touches[0]);
+}
+
+function handleTouchMove(e) {
+    if (!isRedactMode || !isDrawing) return;
+    e.preventDefault();
+    handleDrawMove(e.touches[0]);
+}
+
+function handleTouchEnd(e) {
+    if (!isRedactMode) return;
+    const touch = e.changedTouches?.[0];
+    if (touch) handleDrawEnd(touch);
 }

@@ -1,24 +1,9 @@
 /**
  * docstack State Management
  * 
- * Centralized state store with event-based synchronization.
- * All state mutations should go through exported functions to ensure
- * proper event dispatching for cross-view synchronization.
+ * Centralized state store.
+ * All state mutations should go through exported functions.
  */
-
-// Event emitter for state changes
-export const events = new EventTarget();
-
-// Emit a state change event
-export function emit(type, detail = {}) {
-    events.dispatchEvent(new CustomEvent(type, { detail }));
-}
-
-// Subscribe to state changes
-export function on(type, handler) {
-    events.addEventListener(type, handler);
-    return () => events.removeEventListener(type, handler);
-}
 
 // ============================================
 // Application State
@@ -36,6 +21,7 @@ export function on(type, handler) {
  *   rules: string,
  *   pageRotations: number[],
  *   pageOrder: number[],
+ *   pageRedactions?: Object<number, Array<{x: number, y: number, width: number, height: number}>>,
  *   password?: string,
  *   importedPages?: Array<{newIndex: number, sourceFileId: string, sourcePageIndex: number}>
  * }>}
@@ -79,7 +65,6 @@ export function addFile(fileData) {
     // Invalidate pages view cache
     allPagesRendered = false;
     globalPageOrder = [];
-    emit('file:added', { file: fileData });
 }
 
 /**
@@ -89,7 +74,6 @@ export function addFile(fileData) {
 export function removeFile(fileId) {
     uploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
     globalPageOrder = globalPageOrder.filter(item => item.fileId !== fileId);
-    emit('file:removed', { fileId });
 }
 
 /**
@@ -102,7 +86,6 @@ export function reorderFiles(newFileIds) {
     // Invalidate/Rebuild cache
     allPagesRendered = false;
     globalPageOrder = [];
-    emit('files:reordered', { order: newFileIds });
 }
 
 /**
@@ -127,22 +110,50 @@ export function deletePage(fileId, pageIndex) {
     globalPageOrder = globalPageOrder.filter(
         item => !(item.fileId === fileId && item.pageIndex === pageIndex)
     );
-
-    emit('page:deleted', { fileId, pageIndex });
 }
 
+// ============================================
+// Redaction Functions
+// ============================================
+
 /**
- * Rotate a page
+ * Add a redaction rectangle to a page
  * @param {string} fileId 
  * @param {number} pageIndex 
- * @param {number} degrees - Rotation amount (usually 90)
+ * @param {{x: number, y: number, width: number, height: number}} rect - Rectangle in canvas coordinates
  */
-export function rotatePage(fileId, pageIndex, degrees = 90) {
+export function addRedaction(fileId, pageIndex, rect) {
     const file = getFile(fileId);
     if (!file) return;
 
-    file.pageRotations[pageIndex] = (file.pageRotations[pageIndex] + degrees) % 360;
-    emit('page:rotated', { fileId, pageIndex, rotation: file.pageRotations[pageIndex] });
+    if (!file.pageRedactions) file.pageRedactions = {};
+    if (!file.pageRedactions[pageIndex]) file.pageRedactions[pageIndex] = [];
+
+    file.pageRedactions[pageIndex].push(rect);
+}
+
+/**
+ * Get redactions for a specific page
+ * @param {string} fileId 
+ * @param {number} pageIndex 
+ * @returns {Array<{x: number, y: number, width: number, height: number}>}
+ */
+export function getRedactions(fileId, pageIndex) {
+    const file = getFile(fileId);
+    if (!file || !file.pageRedactions) return [];
+    return file.pageRedactions[pageIndex] || [];
+}
+
+/**
+ * Clear all redactions for a specific page
+ * @param {string} fileId 
+ * @param {number} pageIndex 
+ */
+export function clearRedactions(fileId, pageIndex) {
+    const file = getFile(fileId);
+    if (!file || !file.pageRedactions) return;
+
+    delete file.pageRedactions[pageIndex];
 }
 
 /**
@@ -154,7 +165,6 @@ export function updateFileRules(fileId, rules) {
     const file = getFile(fileId);
     if (file) {
         file.rules = rules;
-        emit('file:rulesUpdated', { fileId, rules });
     }
 }
 
@@ -164,7 +174,6 @@ export function updateFileRules(fileId, rules) {
  */
 export function setView(view) {
     currentView = view;
-    emit('view:changed', { view });
 }
 
 /**
@@ -172,21 +181,6 @@ export function setView(view) {
  */
 export function markPagesViewRendered() {
     allPagesRendered = true;
-}
-
-/**
- * Invalidate pages view cache
- */
-export function invalidatePagesView() {
-    allPagesRendered = false;
-    globalPageOrder = [];
-}
-
-/**
- * Reset pages view state for rebuilding (used on subsequent uploads)
- */
-export function resetPagesViewState() {
-    allPagesRendered = false;
 }
 
 /**
@@ -224,14 +218,6 @@ export function setLightboxState(fileId, orderIndex) {
  */
 export function hasFiles() {
     return uploadedFiles.length > 0;
-}
-
-/**
- * Get file count
- * @returns {number}
- */
-export function getFileCount() {
-    return uploadedFiles.length;
 }
 
 /**

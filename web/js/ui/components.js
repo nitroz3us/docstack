@@ -10,10 +10,9 @@ import * as state from '../state.js';
 
 /**
  * Create a loading skeleton card for file uploads
- * @param {string} fileName 
  * @returns {HTMLElement}
  */
-export function createLoadingCard(fileName) {
+export function createLoadingCard() {
     const card = document.createElement('div');
     card.className = 'pdf-card bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4 animate-pulse';
     card.innerHTML = `
@@ -33,13 +32,11 @@ export function createLoadingCard(fileName) {
  * @param {Object} options.file - File object
  * @param {number} options.pageIndex - Page index (0-based)
  * @param {string} options.view - View type ('files' or 'pages')
- * @param {number} [options.globalIndex] - Global index for pages view
  * @param {Function} [options.onPreview] - Preview click handler
  * @param {Function} [options.onRotate] - Rotate click handler
- * @param {Function} [options.onDelete] - Delete click handler
  * @returns {HTMLElement}
  */
-export function createPageThumb({ file, pageIndex, view, globalIndex, onPreview, onRotate, onDelete }) {
+export function createPageThumb({ file, pageIndex, view, onPreview, onRotate }) {
     const pageNum = pageIndex + 1;
     const thumb = document.createElement('div');
     thumb.className = 'page-thumb relative bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm group cursor-move';
@@ -47,7 +44,6 @@ export function createPageThumb({ file, pageIndex, view, globalIndex, onPreview,
 
     if (view === 'pages') {
         thumb.dataset.fileId = file.id;
-        thumb.dataset.globalIndex = globalIndex;
 
         // Color coding for pages view
         const fileIndex = state.uploadedFiles.findIndex(f => f.id === file.id);
@@ -143,10 +139,9 @@ export function createPageThumb({ file, pageIndex, view, globalIndex, onPreview,
 /**
  * Create a file card for the Files view
  * @param {Object} file - File object
- * @param {Object} handlers - Event handlers
  * @returns {HTMLElement}
  */
-export function createFileCard(file, handlers = {}) {
+export function createFileCard(file) {
     const card = document.createElement('div');
     card.className = 'pdf-card bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all';
     card.dataset.fileId = file.id;

@@ -35,7 +35,7 @@ export async function handleFiles(fileList, handlers, updateUI) {
     if (files.length === 0) return;
 
     for (const file of files) {
-        const loadingCard = createLoadingCard(file.name);
+        const loadingCard = createLoadingCard();
         pdfList.appendChild(loadingCard);
 
         // Scroll to new card
