@@ -14,7 +14,6 @@ import {
     initModals,
     showEncryptionWarningModal,
     showExportProgress,
-    showHelpModal,
     showPageLightbox,
     updateExportProgress,
 } from './ui/modals.js';
@@ -26,7 +25,6 @@ const elementIds = [
     'pageGrid', 'pageCount', 'pagesEmptyState', 'selectionToolbar', 'selectionCount', 'selectAllBtn',
     'rotateSelectedBtn', 'deleteSelectedBtn', 'clearSelectionBtn',
     'densitySelect', 'exportBar', 'undoBtn', 'redoBtn', 'outputNameInput', 'exportPageCount', 'exportBtn',
-    'helpBtn', 'helpModal', 'helpTitle', 'closeHelpModal',
     'pageLightbox', 'lightboxCanvas', 'lightboxContent', 'lightboxTitle', 'lightboxPosition', 'redactionCanvas',
     'redactModeBtn', 'clearRedactionsBtn', 'closeLightbox', 'prevPageBtn', 'nextPageBtn',
     'passwordModal', 'passwordTitle', 'passwordInput', 'passwordError', 'passwordModalFileName',
@@ -121,7 +119,6 @@ function initializeInteractions() {
         processFiles(event.dataTransfer.files);
     });
 
-    elements.helpBtn.addEventListener('click', event => showHelpModal(event.currentTarget));
     elements.showDocumentsBtn.addEventListener('click', () => setMobileView('documents'));
     elements.showPagesBtn.addEventListener('click', () => setMobileView('pages'));
     elements.densitySelect.addEventListener('change', event => setDensity(event.target.value));

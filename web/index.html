@@ -26,9 +26,9 @@
                     <span class="processing-note__status" aria-hidden="true"></span>
                     <span>Files stay private</span>
                 </span>
-                <button id="helpBtn" class="icon-button" type="button" aria-label="Help and processing information">
-                    <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 014.6 1c0 1.7-2.4 2-2.4 3.7M12 17h.01"/></svg>
-                </button>
+                <a class="icon-button github-link" href="https://github.com/nitroz3us/docstack" target="_blank" rel="noopener noreferrer" aria-label="View docstack on GitHub" title="View source on GitHub">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+                </a>
             </div>
         </div>
     </header>
@@ -36,19 +36,29 @@
     <main id="mainContent">
         <section id="landingView" class="landing-shell" aria-labelledby="landingTitle">
             <div class="landing-copy">
-                <h1 id="landingTitle">Merge and arrange PDF pages.</h1>
-                <p>Add PDFs, arrange pages, rotate, remove, or redact them. Processing happens in this browser.</p>
+                <h1 id="landingTitle">Merge PDFs. Keep your files private.</h1>
+                <p>Choose PDFs to arrange, rotate, remove, or redact. Processing happens in your browser, and your files are never sent to a server.</p>
             </div>
 
             <div id="dropZone" class="drop-zone" data-state="idle">
                 <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden>
                 <div class="drop-zone__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M12 12v6M9 15h6"/></svg>
+                    <svg viewBox="0 0 32 32">
+                        <path fill="#909090" d="m24.1 2.072 5.564 5.8v22.056H8.879V30h20.856V7.945z"/>
+                        <path fill="#f4f4f4" d="M24.031 2H8.808v27.928h20.856V7.873z"/>
+                        <path fill="#7a7b7c" d="M8.655 3.5h-6.39v6.827h20.1V3.5z"/>
+                        <path fill="#dd2025" d="M22.472 10.211H2.395V3.379h20.077z"/>
+                        <path fill="#464648" d="M9.052 4.534H7.745v4.8h1.028V7.715L9 7.728a2 2 0 0 0 .647-.117 1.4 1.4 0 0 0 .493-.291 1.2 1.2 0 0 0 .335-.454 2.1 2.1 0 0 0 .105-.908 2.2 2.2 0 0 0-.114-.644 1.17 1.17 0 0 0-.687-.65 2 2 0 0 0-.409-.104 2 2 0 0 0-.319-.026m-.189 2.294h-.089v-1.48h.193a.57.57 0 0 1 .459.181.92.92 0 0 1 .183.558c0 .246 0 .469-.222.626a.94.94 0 0 1-.524.114m3.671-2.306c-.111 0-.219.008-.295.011L12 4.538h-.78v4.8h.918a2.7 2.7 0 0 0 1.028-.175 1.7 1.7 0 0 0 .68-.491 1.9 1.9 0 0 0 .373-.749 3.7 3.7 0 0 0 .114-.949 4.4 4.4 0 0 0-.087-1.127 1.8 1.8 0 0 0-.4-.733 1.6 1.6 0 0 0-.535-.4 2.4 2.4 0 0 0-.549-.178 1.3 1.3 0 0 0-.228-.017m-.182 3.937h-.1V5.392h.013a1.06 1.06 0 0 1 .6.107 1.2 1.2 0 0 1 .324.4 1.3 1.3 0 0 1 .142.526c.009.22 0 .4 0 .549a3 3 0 0 1-.033.513 1.8 1.8 0 0 1-.169.5 1.1 1.1 0 0 1-.363.36.67.67 0 0 1-.416.106m5.08-3.915H15v4.8h1.028V7.434h1.3v-.892h-1.3V5.43h1.4v-.892"/>
+                        <path fill="#dd2025" d="M21.781 20.255s3.188-.578 3.188.511-1.975.646-3.188-.511m-2.357.083a7.5 7.5 0 0 0-1.473.489l.4-.9c.4-.9.815-2.127.815-2.127a14 14 0 0 0 1.658 2.252 13 13 0 0 0-1.4.288Zm-1.262-6.5c0-.949.307-1.208.546-1.208s.508.115.517.939a10.8 10.8 0 0 1-.517 2.434 4.4 4.4 0 0 1-.547-2.162Zm-4.649 10.516c-.978-.585 2.051-2.386 2.6-2.444-.003.001-1.576 3.056-2.6 2.444M25.9 20.895c-.01-.1-.1-1.207-2.07-1.16a14 14 0 0 0-2.453.173 12.5 12.5 0 0 1-2.012-2.655 11.8 11.8 0 0 0 .623-3.1c-.029-1.2-.316-1.888-1.236-1.878s-1.054.815-.933 2.013a9.3 9.3 0 0 0 .665 2.338s-.425 1.323-.987 2.639-.946 2.006-.946 2.006a9.6 9.6 0 0 0-2.725 1.4c-.824.767-1.159 1.356-.725 1.945.374.508 1.683.623 2.853-.91a23 23 0 0 0 1.7-2.492s1.784-.489 2.339-.623 1.226-.24 1.226-.24 1.629 1.639 3.2 1.581 1.495-.939 1.485-1.035"/>
+                        <path fill="#909090" d="M23.954 2.077V7.95h5.633z"/>
+                        <path fill="#f4f4f4" d="M24.031 2v5.873h5.633z"/>
+                        <path fill="#fff" d="M8.975 4.457H7.668v4.8H8.7V7.639l.228.013a2 2 0 0 0 .647-.117 1.4 1.4 0 0 0 .493-.291 1.2 1.2 0 0 0 .332-.454 2.1 2.1 0 0 0 .105-.908 2.2 2.2 0 0 0-.114-.644 1.17 1.17 0 0 0-.687-.65 2 2 0 0 0-.411-.105 2 2 0 0 0-.319-.026m-.189 2.294h-.089v-1.48h.194a.57.57 0 0 1 .459.181.92.92 0 0 1 .183.558c0 .246 0 .469-.222.626a.94.94 0 0 1-.524.114m3.67-2.306c-.111 0-.219.008-.295.011l-.235.006h-.78v4.8h.918a2.7 2.7 0 0 0 1.028-.175 1.7 1.7 0 0 0 .68-.491 1.9 1.9 0 0 0 .373-.749 3.7 3.7 0 0 0 .114-.949 4.4 4.4 0 0 0-.087-1.127 1.8 1.8 0 0 0-.4-.733 1.6 1.6 0 0 0-.535-.4 2.4 2.4 0 0 0-.549-.178 1.3 1.3 0 0 0-.228-.017m-.182 3.937h-.1V5.315h.013a1.06 1.06 0 0 1 .6.107 1.2 1.2 0 0 1 .324.4 1.3 1.3 0 0 1 .142.526c.009.22 0 .4 0 .549a3 3 0 0 1-.033.513 1.8 1.8 0 0 1-.169.5 1.1 1.1 0 0 1-.363.36.67.67 0 0 1-.416.106m5.077-3.915h-2.43v4.8h1.028V7.357h1.3v-.892h-1.3V5.353h1.4v-.892"/>
+                    </svg>
                 </div>
                 <h2>Add your PDF files</h2>
                 <p>Drop them here, or choose files from your device.</p>
                 <button id="browseBtn" class="button button--primary" type="button">Choose PDFs</button>
-                <p class="drop-zone__hint">PDF files only · Local processing</p>
+                <p class="drop-zone__hint">PDF files only · Files stay on your device</p>
             </div>
 
             <div class="landing-features" aria-label="How docstack works">
@@ -224,20 +234,6 @@
             <div class="dialog-actions">
                 <button id="cancelRedactionBtn" class="button button--secondary" type="button">Cancel</button>
                 <button id="proceedRedactionBtn" class="button button--danger" type="button">Enter redaction mode</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="helpModal" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
-        <div class="dialog-card">
-            <div class="dialog-heading">
-                <div><p class="eyebrow">Help</p><h2 id="helpTitle">Processing and workflow</h2></div>
-                <button id="closeHelpModal" class="icon-button" type="button" aria-label="Close help"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-            </div>
-            <div class="help-content">
-                <p>docstack processes PDFs in this browser tab. Files are not uploaded.</p>
-                <h3>Quick workflow</h3>
-                <ol><li>Add PDFs.</li><li>Drag pages or use their move buttons.</li><li>Select pages for bulk rotate or delete.</li><li>Preview redactions, choose a filename, and download.</li></ol>
             </div>
         </div>
     </div>

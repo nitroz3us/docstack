@@ -91,17 +91,6 @@ function setupBackdropCancel(dialog, cancel) {
     });
 }
 
-export function showHelpModal(trigger) {
-    openDialog(elements.helpModal, trigger, {
-        initialFocus: elements.closeHelpModal,
-        escape: hideHelpModal,
-    });
-}
-
-export function hideHelpModal() {
-    closeDialog(elements.helpModal);
-}
-
 export function showPasswordModal(fileName, showError = false) {
     return new Promise(resolve => {
         passwordResolve = resolve;
@@ -327,9 +316,6 @@ export function initModals(domElements) {
     window.addEventListener('resize', () => {
         if (currentPageId) window.requestAnimationFrame(() => renderRedactionOverlay());
     });
-
-    elements.closeHelpModal.addEventListener('click', hideHelpModal);
-    setupBackdropCancel(elements.helpModal, hideHelpModal);
 
     elements.closePasswordModal.addEventListener('click', () => hidePasswordModal(null));
     elements.cancelPasswordBtn.addEventListener('click', () => hidePasswordModal(null));

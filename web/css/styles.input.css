@@ -86,6 +86,7 @@
     }
     .icon-button:hover:not(:disabled) { background: var(--surface-muted); color: var(--text); }
     .icon-button svg { width: 20px; height: 20px; pointer-events: none; }
+    .github-link svg { fill: currentColor; stroke: none; }
     .icon-button--danger { color: var(--danger); }
     .icon-button--inverse { color: white; }
     .icon-button--inverse:hover { background: rgba(255,255,255,.12); color: white; }
@@ -105,8 +106,8 @@
     }
     .drop-zone[data-state="dragover"] { border-color: var(--accent); background: #eff6ff; transform: scale(1.005); }
     .drop-zone[data-state="loading"] { opacity: .72; }
-    .drop-zone__icon { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 16px; background: var(--surface-muted); color: var(--text-muted); }
-    .drop-zone__icon svg { width: 31px; height: 31px; }
+    .drop-zone__icon { width: 58px; height: 58px; display: grid; place-items: center; color: var(--text-muted); }
+    .drop-zone__icon svg { width: 42px; height: 42px; stroke: none; }
     .drop-zone h2 { margin: 18px 0 6px; font-size: 21px; letter-spacing: -.02em; }
     .drop-zone > p { margin: 0 0 20px; color: var(--text-muted); }
     .drop-zone .drop-zone__hint { margin: 16px 0 0; color: var(--text-subtle); font-size: 12px; }
@@ -224,9 +225,6 @@
     .checkbox-row input { width: 18px; height: 18px; }
     .warning-file-list { max-height: 180px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-subtle); padding: 10px 10px 10px 30px; color: var(--text-muted); font-size: 13px; }
     .warning-file-list li { padding: 3px 0; }
-    .help-content { color: var(--text-muted); font-size: 14px; line-height: 1.65; }
-    .help-content h3 { margin: 20px 0 6px; color: var(--text); font-size: 15px; }
-    .help-content ol { padding-left: 22px; }
     .text-link { color: var(--accent); font-weight: 700; text-underline-offset: 3px; }
     .processing-indicator { width: 42px; height: 42px; margin: 0 auto 18px; border: 3px solid #dbeafe; border-top-color: var(--accent); border-radius: 999px; animation: spin .8s linear infinite; }
     .dialog-card--small > h2, .dialog-card--small > .dialog-description { text-align: center; }
