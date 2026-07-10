@@ -1,344 +1,192 @@
 /**
- * docstack Merge Handler
- * 
- * Handles PDF merging logic
+ * Merge the canonical composition into a downloadable PDF.
  */
 
 import * as state from '../state.js';
-import { parseRules } from '../utils/helpers.js';
-import { showEncryptionWarningModal } from '../ui/modals.js';
 
-// pdf-lib reference (set during initialization)
-let PDFDocument = null;
-let degrees = null;
+let pdfLibPromise = null;
 
-/**
- * Initialize merge handler with pdf-lib reference
- * @param {Object} pdfLib - pdf-lib module
- */
-export function initMergeHandler(pdfLib) {
-    PDFDocument = pdfLib.PDFDocument;
-    degrees = pdfLib.degrees;
+function ensurePdfLib() {
+    if (window.PDFLib) return Promise.resolve(window.PDFLib);
+    if (pdfLibPromise) return pdfLibPromise;
+
+    pdfLibPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'lib/pdf-lib.min.js';
+        script.onload = () => window.PDFLib
+            ? resolve(window.PDFLib)
+            : reject(new Error('The local PDF merge library did not initialize.'));
+        script.onerror = () => reject(new Error('The local PDF merge library could not be loaded.'));
+        document.head.appendChild(script);
+    });
+    return pdfLibPromise;
 }
 
-/**
- * Check if a file is password-protected (has a stored password)
- * @param {Object} file 
- * @returns {boolean}
- */
-function isPasswordProtected(file) {
-    return !!file.password;
+function throwIfAborted(signal) {
+    if (signal?.aborted) throw new DOMException('Export cancelled.', 'AbortError');
 }
 
-/**
- * Render a page using PDF.js and return as image data
- * @param {Object} pdfProxy - PDF.js document proxy
- * @param {number} pageNum - 1-indexed page number
- * @param {number} rotation - Rotation in degrees
- * @param {Array} redactions - Optional array of redaction rectangles to draw
- * @returns {Promise<{data: Uint8Array, width: number, height: number}>}
- */
-async function renderPageAsImage(pdfProxy, pageNum, rotation = 0, redactions = []) {
-    const page = await pdfProxy.getPage(pageNum);
-
-    // Use higher scale for better quality
-    const scale = 2.0;
-    const viewport = page.getViewport({ scale, rotation });
-
-    // Create offscreen canvas
+async function renderPageAsImage(pageEntity, sourceFile) {
+    const page = await sourceFile.pdfProxy.getPage(pageEntity.sourcePageIndex + 1);
+    const viewport = page.getViewport({ scale: 2, rotation: pageEntity.rotation });
     const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    const ctx = canvas.getContext('2d');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
 
-    // White background
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const context = canvas.getContext('2d', { alpha: false });
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: context, viewport }).promise;
 
-    // Render the page
-    await page.render({ canvasContext: ctx, viewport }).promise;
-
-    // Draw redactions on the rendered image (true redaction - text is gone)
-    if (redactions && redactions.length > 0) {
-        ctx.fillStyle = 'black';
-        for (const rect of redactions) {
-            // Scale redaction coordinates from lightbox canvas to render canvas
-            // The redaction was drawn on a 1.5x scale lightbox, we're rendering at 2.0x
-            const scaleX = viewport.width / rect.canvasWidth;
-            const scaleY = viewport.height / rect.canvasHeight;
-
-            ctx.fillRect(
-                rect.x * scaleX,
-                rect.y * scaleY,
-                rect.width * scaleX,
-                rect.height * scaleY
+    if (pageEntity.redactions.length > 0) {
+        context.fillStyle = '#000000';
+        pageEntity.redactions.forEach(rect => {
+            context.fillRect(
+                rect.x * canvas.width,
+                rect.y * canvas.height,
+                rect.width * canvas.width,
+                rect.height * canvas.height
             );
-        }
+        });
     }
 
-    // Get image data as JPEG (smaller than PNG)
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
-    const arrayBuffer = await blob.arrayBuffer();
+    const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(result => result ? resolve(result) : reject(new Error('Could not rasterize a PDF page.')), 'image/jpeg', 0.95);
+    });
 
     return {
-        data: new Uint8Array(arrayBuffer),
-        width: viewport.width,
-        height: viewport.height
+        data: new Uint8Array(await blob.arrayBuffer()),
+        width: canvas.width,
+        height: canvas.height,
     };
 }
 
-/**
- * Add a rendered page image to the merged PDF
- * @param {Object} mergedPdf - pdf-lib PDFDocument
- * @param {Uint8Array} imageData - JPEG image data
- * @param {number} width - Image width
- * @param {number} height - Image height
- */
-async function addImagePage(mergedPdf, imageData, width, height) {
-    const image = await mergedPdf.embedJpg(imageData);
-
-    // Create page with image dimensions (scaled down from render resolution)
-    const pageWidth = width / 2; // Divide by scale factor
-    const pageHeight = height / 2;
-
-    const page = mergedPdf.addPage([pageWidth, pageHeight]);
+async function addImagePage(mergedPdf, imageData) {
+    const image = await mergedPdf.embedJpg(imageData.data);
+    const page = mergedPdf.addPage([imageData.width / 2, imageData.height / 2]);
     page.drawImage(image, {
         x: 0,
         y: 0,
-        width: pageWidth,
-        height: pageHeight,
+        width: imageData.width / 2,
+        height: imageData.height / 2,
     });
 }
 
-/**
- * Load a PDF for merging, handling encryption properly
- * @param {ArrayBuffer} arrayBuffer - PDF data
- * @param {string|null} password - Optional password
- * @returns {Promise<Object|null>} - pdf-lib document or null if password-protected
- */
-async function loadPdfForMerge(arrayBuffer, password) {
-    // If PDF has a password, pdf-lib cannot decrypt it
-    // We'll return null to signal that we need to use the image-based fallback
-    if (password) {
-        console.log('PDF has password, will use image-based merge');
-        return null;
-    }
-
-    // Try loading without any options first (unencrypted PDFs)
+async function loadSourceDocument(PDFDocument, sourceFile) {
+    if (sourceFile.password) return null;
     try {
-        return await PDFDocument.load(arrayBuffer);
+        return await PDFDocument.load(sourceFile.arrayBuffer);
     } catch (error) {
-        // If it fails due to encryption, try with ignoreEncryption
-        // This handles owner-password-only PDFs (print/copy restrictions)
-        if (error.message?.includes('encrypted')) {
-            console.log('PDF has owner restrictions, fallback to image render');
-            // pdf-lib cannot decrypt content even with ignoreEncryption: true, so use the image-based fallback
-            return null;
-        }
+        if (error.message?.toLowerCase().includes('encrypted')) return null;
         throw error;
     }
 }
 
+async function findRestrictedFiles(PDFDocument, pages, signal) {
+    const restricted = [];
+    const checked = new Set();
+
+    for (const page of pages) {
+        throwIfAborted(signal);
+        const file = page.sourceFile;
+        if (!file || checked.has(file.id)) continue;
+        checked.add(file.id);
+
+        if (file.password) {
+            restricted.push(file);
+            continue;
+        }
+
+        try {
+            await PDFDocument.load(file.arrayBuffer);
+        } catch (error) {
+            if (error.message?.toLowerCase().includes('encrypted')) restricted.push(file);
+        }
+    }
+    return restricted;
+}
+
+function triggerDownload(bytes, name) {
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = name;
+    anchor.hidden = true;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /**
- * Merge PDFs and trigger download
- * @param {Function} showLoading - Show loading overlay
- * @param {Function} hideLoading - Hide loading overlay
+ * @param {Object} options
+ * @param {(progress: {stage: string, current: number, total: number}) => void} [options.onProgress]
+ * @param {(files: Array<Object>) => Promise<boolean>} [options.onRestrictedFiles]
+ * @param {AbortSignal} [options.signal]
  */
-export async function mergePDFs(showLoading, hideLoading) {
-    if (state.uploadedFiles.length === 0) return;
+export async function mergePDFs({ onProgress, onRestrictedFiles, signal } = {}) {
+    const plan = state.getMergePlan();
+    if (plan.pages.length === 0) throw new Error('Add at least one page before exporting.');
+    if (plan.errors.length > 0) throw new Error(plan.errors.join(' '));
 
-    // Check for restricted files (both password-protected and owner-restricted)
-    const restrictedFiles = [];
-    const checkCache = {}; // Avoid checking same file multiple times if used in multiple pages logic
+    onProgress?.({ stage: 'Loading export tools', current: 0, total: plan.pages.length });
+    const { PDFDocument, degrees } = await ensurePdfLib();
+    throwIfAborted(signal);
 
-    // Helper to check if a file needs image fallback
-    const checkFile = async (file) => {
-        if (checkCache[file.id]) return checkCache[file.id];
+    onProgress?.({ stage: 'Checking document permissions', current: 0, total: plan.pages.length });
+    const restrictedFiles = await findRestrictedFiles(PDFDocument, plan.pages, signal);
+    if (restrictedFiles.length > 0 && onRestrictedFiles) {
+        const proceed = await onRestrictedFiles(restrictedFiles);
+        if (!proceed) return { cancelled: true };
+    }
 
-        let isRestricted = false;
+    const mergedPdf = await PDFDocument.create();
+    const documentCache = new Map();
 
-        // Case 1: Has user password
-        if (isPasswordProtected(file)) {
-            isRestricted = true;
+    for (let index = 0; index < plan.pages.length; index++) {
+        throwIfAborted(signal);
+        const pageEntity = plan.pages[index];
+        const sourceFile = pageEntity.sourceFile;
+        onProgress?.({
+            stage: `Preparing page ${index + 1} of ${plan.pages.length}`,
+            current: index,
+            total: plan.pages.length,
+        });
+
+        const mustRasterize = sourceFile.password || pageEntity.redactions.length > 0;
+        if (mustRasterize) {
+            await addImagePage(mergedPdf, await renderPageAsImage(pageEntity, sourceFile));
+            continue;
         }
-        // Case 2: Check for owner restrictions by trying to load with pdf-lib
-        else {
-            try {
-                // If this throws "encrypted", it's restricted
-                await PDFDocument.load(file.arrayBuffer);
-            } catch (error) {
-                if (error.message?.includes('encrypted')) {
-                    isRestricted = true;
-                }
-            }
+
+        if (!documentCache.has(sourceFile.id)) {
+            documentCache.set(sourceFile.id, await loadSourceDocument(PDFDocument, sourceFile));
+        }
+        const sourceDocument = documentCache.get(sourceFile.id);
+
+        if (!sourceDocument) {
+            await addImagePage(mergedPdf, await renderPageAsImage(pageEntity, sourceFile));
+            continue;
         }
 
-        checkCache[file.id] = isRestricted;
-        return isRestricted;
+        const [copiedPage] = await mergedPdf.copyPages(sourceDocument, [pageEntity.sourcePageIndex]);
+        if (pageEntity.rotation !== 0) {
+            copiedPage.setRotation(degrees(copiedPage.getRotation().angle + pageEntity.rotation));
+        }
+        mergedPdf.addPage(copiedPage);
+    }
+
+    throwIfAborted(signal);
+    onProgress?.({ stage: 'Finalizing download', current: plan.pages.length, total: plan.pages.length });
+    const bytes = await mergedPdf.save();
+    throwIfAborted(signal);
+    triggerDownload(bytes, plan.name);
+
+    return {
+        cancelled: false,
+        name: plan.name,
+        pageCount: plan.pages.length,
+        byteLength: bytes.byteLength,
     };
-
-    // Check all uploaded files
-    showLoading('Checking file permissions...');
-
-    for (const file of state.uploadedFiles) {
-        if (await checkFile(file)) {
-            restrictedFiles.push(file);
-        }
-    }
-
-    if (restrictedFiles.length > 0) {
-        hideLoading(); // Hide loading while modal is shown
-        const proceed = await showEncryptionWarningModal(restrictedFiles);
-        if (!proceed) return;
-        showLoading('Merging PDFs...'); // Show loading again
-    } else {
-        // Just update loading text
-        showLoading('Merging PDFs...');
-    }
-
-    try {
-        const mergedPdf = await PDFDocument.create();
-
-        // If in "All Pages" mode and globalPageOrder is set, use that order
-        if (state.currentView === 'allPages' && state.globalPageOrder.length > 0) {
-            // Cache loaded documents to avoid reloading
-            const docCache = {};
-
-            for (const { fileId, pageIndex } of state.globalPageOrder) {
-                const file = state.getFile(fileId);
-                if (!file) continue;
-
-                // WRAPPER LOGIC START: Check for imported page
-                const importedPage = file.importedPages?.find(p => p.newIndex === pageIndex);
-                let srcFile;
-                let actualPageIndex;
-
-                if (importedPage) {
-                    srcFile = state.getFile(importedPage.sourceFileId);
-                    if (!srcFile) continue;
-                    actualPageIndex = importedPage.sourcePageIndex;
-                } else {
-                    srcFile = file;
-                    actualPageIndex = pageIndex;
-                }
-
-                const rotation = file.pageRotations[pageIndex] || 0;
-
-                // Check for redactions on this page
-                const redactions = state.getRedactions(fileId, pageIndex);
-                const hasRedactions = redactions && redactions.length > 0;
-
-                // Check if source file is password-protected OR has redactions
-                if (isPasswordProtected(srcFile) || hasRedactions) {
-                    // Use image-based rendering (true redaction - text is removed)
-                    const imageData = await renderPageAsImage(srcFile.pdfProxy, actualPageIndex + 1, rotation, redactions);
-                    await addImagePage(mergedPdf, imageData.data, imageData.width, imageData.height);
-                } else {
-                    // Use normal pdf-lib copy
-                    if (!docCache[srcFile.id]) {
-                        docCache[srcFile.id] = await loadPdfForMerge(srcFile.arrayBuffer, srcFile.password);
-                    }
-                    const srcDoc = docCache[srcFile.id];
-
-                    if (srcDoc) {
-                        const [copiedPage] = await mergedPdf.copyPages(srcDoc, [actualPageIndex]);
-                        if (rotation !== 0) {
-                            const currentRotation = copiedPage.getRotation().angle;
-                            copiedPage.setRotation(degrees(currentRotation + rotation));
-                        }
-                        mergedPdf.addPage(copiedPage);
-                    } else {
-                        // Fallback to image if pdf-lib loading failed
-                        const imageData = await renderPageAsImage(srcFile.pdfProxy, actualPageIndex + 1, rotation);
-                        await addImagePage(mergedPdf, imageData.data, imageData.width, imageData.height);
-                    }
-                }
-            }
-        } else {
-            // Original "Files" mode logic (with cross-file drag support)
-            const docCache = {};
-
-            for (const file of state.uploadedFiles) {
-                // Use text rules if provided, otherwise use pageOrder (drag-and-drop order)
-                let pagesToProcess;
-                if (file.rules.trim()) {
-                    pagesToProcess = parseRules(file.rules, file.pageCount);
-                } else {
-                    // Use custom pageOrder from drag-and-drop
-                    pagesToProcess = file.pageOrder.map(pageIndex => ({
-                        page: pageIndex,
-                        rotation: 0
-                    }));
-                }
-
-                for (const rule of pagesToProcess) {
-                    // Check if this is an imported page from another file
-                    const importedPage = file.importedPages?.find(p => p.newIndex === rule.page);
-
-                    let srcFile;
-                    let actualPageIndex;
-
-                    if (importedPage) {
-                        srcFile = state.getFile(importedPage.sourceFileId);
-                        if (!srcFile) continue;
-                        actualPageIndex = importedPage.sourcePageIndex;
-                    } else {
-                        srcFile = file;
-                        actualPageIndex = rule.page;
-                    }
-
-                    const visualRotation = file.pageRotations[rule.page] || 0;
-                    const totalRotation = rule.rotation + visualRotation;
-
-                    // Check for redactions on this page
-                    const redactions = state.getRedactions(file.id, rule.page);
-                    const hasRedactions = redactions && redactions.length > 0;
-
-                    // Check if source file is password-protected OR has redactions
-                    if (isPasswordProtected(srcFile) || hasRedactions) {
-                        // Use image-based rendering (true redaction - text is removed)
-                        const imageData = await renderPageAsImage(srcFile.pdfProxy, actualPageIndex + 1, totalRotation, redactions);
-                        await addImagePage(mergedPdf, imageData.data, imageData.width, imageData.height);
-                    } else {
-                        // Use normal pdf-lib copy
-                        if (!docCache[srcFile.id]) {
-                            docCache[srcFile.id] = await loadPdfForMerge(srcFile.arrayBuffer, srcFile.password);
-                        }
-                        const srcDoc = docCache[srcFile.id];
-
-                        if (srcDoc) {
-                            const [copiedPage] = await mergedPdf.copyPages(srcDoc, [actualPageIndex]);
-                            if (totalRotation !== 0) {
-                                const currentRotation = copiedPage.getRotation().angle;
-                                copiedPage.setRotation(degrees(currentRotation + totalRotation));
-                            }
-                            mergedPdf.addPage(copiedPage);
-                        } else {
-                            // Fallback to image if pdf-lib loading failed
-                            const imageData = await renderPageAsImage(srcFile.pdfProxy, actualPageIndex + 1, totalRotation);
-                            await addImagePage(mergedPdf, imageData.data, imageData.width, imageData.height);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Save and download
-        const mergedPdfBytes = await mergedPdf.save();
-        const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'merged.pdf';
-        a.click();
-
-        URL.revokeObjectURL(url);
-        hideLoading();
-
-    } catch (error) {
-        console.error('Error merging PDFs:', error);
-        hideLoading();
-        alert('Failed to merge PDFs: ' + error.message);
-    }
 }

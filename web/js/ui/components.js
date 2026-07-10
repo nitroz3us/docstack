@@ -1,206 +1,136 @@
-/**
- * docstack UI Components
- * 
- * Reusable component builders for consistent UI across views
- */
+import { formatFileSize } from '../utils/helpers.js';
 
-import { getFileHue, formatFileSize } from '../utils/helpers.js';
-import { renderPdfPage } from '../utils/pdf.js';
-import * as state from '../state.js';
+const ICONS = {
+    rotate: '<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>',
+    left: '<path d="M15 5l-7 7 7 7"/>',
+    right: '<path d="M9 5l7 7-7 7"/>',
+    up: '<path d="M5 15l7-7 7 7"/>',
+    down: '<path d="M5 9l7 7 7-7"/>',
+    delete: '<path fill="currentColor" stroke="none" d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zM17 6H7v13h10zM9 17h2V8H9zm4 0h2V8h-2zM7 6v13z"/>',
+};
 
-/**
- * Create a loading skeleton card for file uploads
- * @returns {HTMLElement}
- */
-export function createLoadingCard() {
+export function createIconButton({ icon, label, className = 'icon-button', action }) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = className;
+    button.setAttribute('aria-label', label);
+    button.dataset.action = action;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.innerHTML = ICONS[icon];
+    button.appendChild(svg);
+    return button;
+}
+
+export function createLoadingDocumentCard(fileName) {
     const card = document.createElement('div');
-    card.className = 'pdf-card bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4 animate-pulse';
-    card.innerHTML = `
-        <div class="w-16 h-20 bg-gray-200 rounded-lg flex-shrink-0"></div>
-        <div class="flex-1 min-w-0">
-            <p class="h-4 bg-gray-200 rounded w-3/4 mb-2"></p>
-            <p class="h-3 bg-gray-200 rounded w-1/2"></p>
-        </div>
-        <div class="w-5 h-5 bg-gray-200 rounded-full"></div>
-    `;
+    card.className = 'document-item document-item--loading';
+    card.setAttribute('aria-label', `Loading ${fileName}`);
+    card.innerHTML = '<div class="skeleton skeleton--preview"></div><div class="flex-1"><div class="skeleton skeleton--line"></div><div class="skeleton skeleton--line skeleton--short"></div></div>';
     return card;
 }
 
-/**
- * Create a page thumbnail element
- * @param {Object} options
- * @param {Object} options.file - File object
- * @param {number} options.pageIndex - Page index (0-based)
- * @param {string} options.view - View type ('files' or 'pages')
- * @param {Function} [options.onPreview] - Preview click handler
- * @param {Function} [options.onRotate] - Rotate click handler
- * @returns {HTMLElement}
- */
-export function createPageThumb({ file, pageIndex, view, onPreview, onRotate }) {
-    const pageNum = pageIndex + 1;
-    const thumb = document.createElement('div');
-    thumb.className = 'page-thumb relative bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm group cursor-move';
-    thumb.dataset.pageIndex = pageIndex;
+export function createDocumentItem(file, index, totalFiles) {
+    const item = document.createElement('article');
+    item.className = 'document-item';
+    item.dataset.fileId = file.id;
 
-    if (view === 'pages') {
-        thumb.dataset.fileId = file.id;
+    const preview = document.createElement('div');
+    preview.className = 'document-preview';
+    const canvas = document.createElement('canvas');
+    canvas.className = 'document-preview__canvas';
+    canvas.setAttribute('aria-hidden', 'true');
+    const spinner = document.createElement('span');
+    spinner.className = 'thumbnail-spinner';
+    spinner.setAttribute('aria-hidden', 'true');
+    preview.append(canvas, spinner);
 
-        // Color coding for pages view
-        const fileIndex = state.uploadedFiles.findIndex(f => f.id === file.id);
-        const hue = getFileHue(fileIndex);
-        const colorStyle = `border-left-color: hsl(${hue}, 70%, 50%);`;
+    const content = document.createElement('div');
+    content.className = 'document-item__content';
+    const name = document.createElement('h3');
+    name.className = 'document-item__name';
+    name.textContent = file.name;
+    name.title = file.name;
+    const meta = document.createElement('p');
+    meta.className = 'document-item__meta';
+    meta.textContent = `${file.pageCount} page${file.pageCount === 1 ? '' : 's'} · ${formatFileSize(file.size)}`;
+    const actions = document.createElement('div');
+    actions.className = 'document-item__actions';
+    actions.append(
+        createIconButton({ icon: 'up', label: `Move ${file.name} earlier`, action: 'move-file-up' }),
+        createIconButton({ icon: 'down', label: `Move ${file.name} later`, action: 'move-file-down' }),
+        createIconButton({ icon: 'delete', label: `Remove ${file.name}`, className: 'icon-button icon-button--danger', action: 'delete-file' })
+    );
+    actions.children[0].disabled = index === 0;
+    actions.children[1].disabled = index === totalFiles - 1;
 
-        thumb.innerHTML = `
-            <div class="canvas-wrapper aspect-[3/4] bg-gray-100 border-l-4 relative" style="${colorStyle} transform: rotate(${file.pageRotations[pageIndex]}deg)">
-                <canvas class="w-full h-full"></canvas>
-                <div class="thumbnail-spinner absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
-                    <div class="w-6 h-6 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin"></div>
-                </div>
-            </div>
-            <div class="absolute top-0 left-0 right-0 bg-gray-100/95 backdrop-blur-sm py-1.5 flex justify-center gap-1.5 sm:gap-1 border-b border-gray-100">
-                <button class="preview-page-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-blue-50 rounded-full flex items-center justify-center transition-all" title="Preview">
-                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                </button>
-                <button class="rotate-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-gray-100 rounded-full flex items-center justify-center transition-all" title="Rotate 90°">
-                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                </button>
-                <button class="delete-page-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-red-50 rounded-full flex items-center justify-center transition-all" title="Delete page">
-                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 hover:text-red-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <div class="flex items-center justify-between text-[10px] text-gray-500 py-1 px-1.5 bg-white border-t border-gray-50">
-                <span class="font-medium truncate max-w-[80px]" title="${file.name}">${file.name}</span>
-                <span>p.${pageNum}</span>
-            </div>
-        `;
-    } else {
-        // Files view - also needs file ID for deletion sync
-        thumb.dataset.fileId = file.id;
-
-        thumb.innerHTML = `
-            <div class="canvas-wrapper aspect-[3/4] bg-gray-100" style="transform: rotate(${file.pageRotations[pageIndex]}deg)">
-                <canvas class="w-full h-full"></canvas>
-                <div class="thumbnail-spinner absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
-                    <div class="w-6 h-6 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin"></div>
-                </div>
-            </div>
-            <div class="absolute top-0 left-0 right-0 bg-gray-100/95 backdrop-blur-sm py-1.5 flex justify-center gap-1.5 sm:gap-1 border-b border-gray-100">
-                <button class="preview-page-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-blue-50 rounded-full flex items-center justify-center transition-all" title="Preview">
-                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                </button>
-                <button class="rotate-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-gray-100 rounded-full flex items-center justify-center transition-all" title="Rotate 90°">
-                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                </button>
-                <button class="delete-page-btn w-9 h-9 sm:w-7 sm:h-7 bg-gray-50 hover:bg-red-50 rounded-full flex items-center justify-center transition-all" title="Delete page">
-                    <svg class="w-5 h-5 sm:w-4 sm:h-4 text-gray-600 hover:text-red-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <div class="flex items-center justify-between text-[10px] text-gray-500 py-1 px-1.5 bg-white">
-                <span class="page-num">${pageNum}</span>
-                <span class="rotation-label text-gray-400">${file.pageRotations[pageIndex] > 0 ? file.pageRotations[pageIndex] + '°' : ''}</span>
-            </div>
-        `;
-    }
-
-    // Attach event handlers
-    if (onPreview) {
-        thumb.querySelector('.preview-page-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            onPreview(file.id, pageIndex);
-        });
-    }
-
-    if (onRotate) {
-        thumb.querySelector('.rotate-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            onRotate(file, pageIndex, thumb);
-        });
-    }
-
-    // Delete is handled via event delegation, not per-element
-
-    return thumb;
+    content.append(name, meta, actions);
+    item.append(preview, content);
+    return item;
 }
 
-/**
- * Create a file card for the Files view
- * @param {Object} file - File object
- * @returns {HTMLElement}
- */
-export function createFileCard(file) {
-    const card = document.createElement('div');
-    card.className = 'pdf-card bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all';
-    card.dataset.fileId = file.id;
+export function createPageTile(page, file, position, totalPages, selected) {
+    const tile = document.createElement('article');
+    tile.className = `page-tile${selected ? ' page-tile--selected' : ''}`;
+    tile.dataset.pageId = page.id;
+    tile.dataset.sourceFileId = page.sourceFileId;
+    const dragHandle = document.createElement('span');
+    dragHandle.className = 'page-drag-handle';
+    dragHandle.setAttribute('aria-hidden', 'true');
+    dragHandle.title = 'Drag to reorder';
+    dragHandle.textContent = '⠿';
 
-    card.innerHTML = `
-        <!-- Card Header (always visible) -->
-        <div class="card-header flex items-center gap-4 p-4 cursor-pointer">
-            <div class="relative w-16 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                <canvas class="pdf-preview w-full h-full object-cover"></canvas>
-                <div class="thumbnail-spinner absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
-                    <div class="w-5 h-5 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin"></div>
-                </div>
-                <div class="page-count absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full z-20">
-                    ${file.pageCount}
-                </div>
-            </div>
-            <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900 truncate" title="${file.name}">${file.name}</p>
-                <p class="text-xs text-gray-400 mt-0.5">${file.pageCount} page${file.pageCount > 1 ? 's' : ''} • ${formatFileSize(file.size)}</p>
-                <div class="flex items-center gap-2 mt-2">
-                    <input 
-                        type="text" 
-                        placeholder="Pages (e.g. 1..3, 5)"
-                        class="rules-input flex-1 text-xs px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-gray-400"
-                        data-file-id="${file.id}"
-                        onclick="event.stopPropagation()"
-                    >
-                    <button type="button" class="help-btn text-gray-400 hover:text-gray-600 p-1" onclick="event.stopPropagation()">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                <svg class="expand-icon w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-                <button class="delete-btn text-gray-400 hover:text-red-500 p-1" data-file-id="${file.id}" onclick="event.stopPropagation()">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-        
-        <!-- Expanded Pages (hidden by default) -->
-        <div class="pages-panel hidden border-t border-gray-100 bg-gray-50 p-3 sm:p-4">
-            <p class="text-xs text-gray-400 mb-3 text-center">Drag to reorder • Click icons to preview, rotate, or delete</p>
-            <div class="pages-grid grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-3">
-                <!-- Page thumbnails will be inserted here -->
-            </div>
-        </div>
-    `;
+    const selection = document.createElement('label');
+    selection.className = 'page-select';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = selected;
+    checkbox.dataset.action = 'select-page';
+    checkbox.setAttribute('aria-label', `Select page ${position + 1}, ${file.name} page ${page.sourcePageIndex + 1}`);
+    const mark = document.createElement('span');
+    mark.setAttribute('aria-hidden', 'true');
+    selection.append(checkbox, mark);
 
-    // Render first page preview
-    const canvas = card.querySelector('.pdf-preview');
-    const spinner = card.querySelector('.thumbnail-spinner');
-    renderPdfPage(file.pdfProxy, 1, canvas, 0.4).finally(() => spinner?.remove());
+    const canvasWrap = document.createElement('button');
+    canvasWrap.type = 'button';
+    canvasWrap.className = 'page-canvas-wrap';
+    canvasWrap.dataset.action = 'preview';
+    canvasWrap.setAttribute('aria-label', `Preview page ${position + 1}, ${file.name} page ${page.sourcePageIndex + 1}`);
+    const canvas = document.createElement('canvas');
+    canvas.className = 'page-canvas';
+    canvas.dataset.rendered = 'false';
+    const spinner = document.createElement('span');
+    spinner.className = 'thumbnail-spinner';
+    spinner.setAttribute('aria-hidden', 'true');
+    canvasWrap.append(canvas, spinner);
 
-    return card;
+    const info = document.createElement('div');
+    info.className = 'page-tile__info';
+    const order = document.createElement('strong');
+    order.textContent = String(position + 1);
+    const source = document.createElement('span');
+    source.textContent = `${file.name} · p.${page.sourcePageIndex + 1}`;
+    source.title = `${file.name}, source page ${page.sourcePageIndex + 1}`;
+    const status = document.createElement('span');
+    status.className = 'page-tile__status';
+    const statusParts = [];
+    if (page.rotation) statusParts.push(`${page.rotation}°`);
+    if (page.redactions.length) statusParts.push(`${page.redactions.length} redaction${page.redactions.length === 1 ? '' : 's'}`);
+    status.textContent = statusParts.join(' · ');
+    info.append(order, source, status);
+
+    const actions = document.createElement('div');
+    actions.className = 'page-tile__actions';
+    actions.append(
+        createIconButton({ icon: 'rotate', label: `Rotate page ${position + 1}`, action: 'rotate-page' }),
+        createIconButton({ icon: 'left', label: `Move page ${position + 1} earlier`, action: 'move-page-left' }),
+        createIconButton({ icon: 'right', label: `Move page ${position + 1} later`, action: 'move-page-right' }),
+        createIconButton({ icon: 'delete', label: `Delete page ${position + 1}`, className: 'icon-button icon-button--danger', action: 'delete-page' })
+    );
+    actions.children[1].disabled = position === 0;
+    actions.children[2].disabled = position === totalPages - 1;
+
+    tile.append(selection, dragHandle, canvasWrap, info, actions);
+    return tile;
 }

@@ -3,355 +3,255 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>docstack - Merge PDFs</title>
-    <meta name="description" content="Merge, splice, and rotate PDF files directly in your browser. No uploads, completely private.">
-    
-    <!-- Open Graph / Facebook -->
+    <meta name="theme-color" content="#f8fafc">
+    <title>docstack — Merge and arrange PDFs</title>
+    <meta name="description" content="Merge, reorder, rotate, remove, and redact PDF pages in your browser.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://docstack.tools/">
-    <meta property="og:title" content="docstack - Privacy-First PDF Merger">
-    <meta property="og:description" content="Merge, splice, and rotate PDF files directly in your browser. No uploads, completely private.">
+    <meta property="og:title" content="docstack — Merge and arrange PDFs">
+    <meta property="og:description" content="Merge and organize PDFs locally in your browser.">
     <meta property="og:image" content="https://docstack.tools/assets/thumbnail.png">
-    
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://docstack.tools/">
-    <meta name="twitter:title" content="docstack - Privacy-First PDF Merger">
-    <meta name="twitter:description" content="Merge, splice, and rotate PDF files directly in your browser. No uploads, completely private.">
-    <meta name="twitter:image" content="https://docstack.tools/assets/thumbnail.png">
-    
-    <!-- Libraries (self-hosted for privacy and offline use) -->
-    <script src="lib/sortable.min.js"></script>
-    <script src="lib/pdf-lib.min.js"></script>
-    
-    <!-- Fonts (optional - will use system fonts offline) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- TailwindCSS (CDN for now, generates CSS on-the-fly) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    screens: {
-                        'xs': '480px',
-                    },
-                }
-            }
-        }
-    </script>
-    
-    <!-- Custom Styles -->
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/styles.css">
 </head>
-<body class="bg-gray-50 min-h-screen font-sans antialiased">
-    <div class="max-w-5xl mx-auto px-4 py-6 sm:px-6 sm:py-12 xl:px-8">
-        <!-- Header -->
-        <header class="text-center mb-12">
-            <div class="flex items-center justify-center gap-3 mb-2">
-                <h1 class="text-3xl xl:text-4xl font-semibold text-gray-900 tracking-tight">docstack</h1>
-                <a href="https://github.com/nitroz3us/docstack" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-gray-600 transition-colors" title="View on GitHub">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                        <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
-                    </svg>
-                </a>
-            </div>
-            <p class="text-gray-500 text-sm xl:text-base">Merge, splice, and rotate your PDFs</p>
-            <p class="mt-1 text-gray-400 text-xs xl:text-sm">100% client-side • Your files never leave your device</p>
-            <a href="docs/architecture.html" class="inline-block mt-3 text-gray-400 hover:text-gray-600 transition-colors text-xs font-medium underline underline-offset-2" title="Technical Deep Dive">
-                How it Works →
-            </a>
-        </header>
+<body class="min-h-screen bg-slate-50 text-slate-950 antialiased">
+    <a href="#mainContent" class="skip-link">Skip to main content</a>
 
-        <!-- Drop Zone -->
-        <div id="dropZone" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 xl:p-16 text-center cursor-pointer transition-all duration-200 hover:border-gray-400 hover:bg-gray-50/50 mb-6 sm:mb-8">
-            <input type="file" id="fileInput" accept=".pdf" multiple class="hidden">
-            <svg class="mx-auto h-12 w-12 xl:h-16 xl:w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p class="text-gray-600 font-medium xl:text-lg">Drop PDF files here</p>
-            <p class="text-gray-400 text-sm xl:text-base mt-1">or click to browse</p>
-        </div>
-
-        <!-- View Toggle (shown when files exist) -->
-        <div id="viewToggle" class="hidden flex gap-1 p-1 mb-6 bg-gray-100 rounded-lg mx-auto border border-gray-200">
-            <button id="byFileBtn" class="flex-1 py-2 text-sm font-medium text-gray-900 bg-white rounded-md shadow-sm">
-                Files
-            </button>
-            <button id="allPagesBtn" class="flex-1 py-2 text-sm font-medium text-gray-500 rounded-md hover:text-gray-700">
-                Pages
-            </button>
-        </div>
-
-        <!-- Background Rendering Progress (hidden by default) -->
-        <div id="renderProgress" class="hidden mb-6">
-            <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
-                <span id="renderProgressText">Preparing pages...</span>
-                <span id="renderProgressPercent">0%</span>
-            </div>
-            <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div id="renderProgressBar" class="h-full bg-blue-500 rounded-full transition-all duration-200" style="width: 0%"></div>
-            </div>
-            <p id="renderProgressHint" class="hidden text-xs text-gray-400 mt-1.5 text-center"></p>
-        </div>
-
-        <!-- PDF List (By File view) -->
-        <div id="pdfList" class="flex flex-col gap-4 mb-8">
-            <!-- PDF cards will be inserted here -->
-        </div>
-
-        <!-- All Pages View (hidden by default) -->
-        <div id="allPagesView" class="hidden mb-8">
-            <p class="text-xs text-gray-400 mb-3 text-center">Drag to reorder across all files • Click icons to preview, rotate, or delete</p>
-            <div id="allPagesGrid" class="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-3">
-                <!-- All page thumbnails will be inserted here -->
-            </div>
-        </div>
-
-        <!-- Empty State -->
-        <div id="emptyState" class="text-center py-8 text-gray-400 text-sm">
-            No PDFs uploaded yet
-        </div>
-
-        <!-- Merge Button -->
-        <div id="mergeSection" class="hidden">
-            <button id="mergeBtn" class="w-full bg-gray-900 text-white py-3.5 px-6 rounded-lg font-medium text-sm transition-all duration-200 hover:bg-gray-800 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span>Merge & Download</span>
-            </button>
-        </div>
-
-        <!-- Loading Overlay -->
-        <div id="loadingOverlay" class="hidden fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-            <div class="text-center">
-                <div class="w-10 h-10 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin mx-auto mb-4"></div>
-                <p class="text-gray-600 text-sm" id="loadingText">Processing...</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Page Preview Lightbox -->
-    <div id="pageLightbox" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div class="relative w-full h-full max-w-6xl flex flex-col items-center justify-center">
-            
-            <!-- Title (Bottom Center) -->
-            <div class="absolute bottom-0 right-0 left-0 flex items-center justify-center p-4 z-20 pointer-events-none">
-                <span id="lightboxTitle" class="text-sm font-medium text-white/90 drop-shadow-md truncate max-w-[70%] bg-black/40 px-4 py-1.5 rounded-full backdrop-blur-sm pointer-events-auto text-center"></span>
-            </div>
-            <button id="closeLightbox" class="absolute top-4 right-4 z-20 text-white hover:text-white transition-colors bg-black/50 hover:bg-black/80 rounded-full p-2 backdrop-blur-sm">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-
-            <!-- Navigation Buttons -->
-            <button id="prevPageBtn" class="absolute left-2 top-1/2 -translate-y-1/2 z-20 text-white hover:text-white transition-colors p-2 bg-black/50 hover:bg-black/80 rounded-full hidden backdrop-blur-sm">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-            </button>
-            <button id="nextPageBtn" class="absolute right-2 top-1/2 -translate-y-1/2 z-20 text-white hover:text-white transition-colors p-2 bg-black/50 hover:bg-black/80 rounded-full hidden backdrop-blur-sm">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-            </button>
-
-            <!-- Content: px-14 reserves ~56px on each side so the canvas never reaches the arrow zones -->
-            <div class="flex items-center justify-center w-full h-full overflow-hidden px-14 py-2 relative" id="lightboxContent">
-                <canvas id="lightboxCanvas" class="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-150"></canvas>
-                <!-- Redaction canvas overlay (same size as lightboxCanvas, positioned on top) -->
-                <canvas id="redactionCanvas" class="absolute pointer-events-none"></canvas>
-            </div>
-
-            <!-- Redaction Toolbar (Top Left) -->
-            <div class="absolute top-4 left-4 z-20 flex gap-2">
-                <button id="redactModeBtn" class="text-white transition-colors bg-red-600/80 hover:bg-red-500 rounded-full px-4 py-2 backdrop-blur-md flex items-center gap-2 text-sm font-semibold shadow-lg shadow-red-900/40 ring-1 ring-red-400/40">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                    <span>Redact</span>
-                </button>
-                <button id="clearRedactionsBtn" class="hidden text-white/70 hover:text-red-400 transition-colors bg-black/20 hover:bg-black/40 rounded-full px-4 py-2 backdrop-blur-md flex items-center gap-2 text-sm font-medium">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    <span>Clear</span>
+    <header class="app-header">
+        <div class="app-header__inner">
+            <a href="./" class="brand" aria-label="docstack home">docstack</a>
+            <div class="flex items-center gap-2 sm:gap-3">
+                <span class="processing-note" title="Files are processed in this browser and are not uploaded">
+                    <span class="processing-note__status" aria-hidden="true"></span>
+                    <span>Files stay private</span>
+                </span>
+                <button id="helpBtn" class="icon-button" type="button" aria-label="Help and processing information">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 014.6 1c0 1.7-2.4 2-2.4 3.7M12 17h.01"/></svg>
                 </button>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!-- Password Modal -->
-    <div id="passwordModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-        <div class="bg-white rounded-lg max-w-sm w-full overflow-hidden shadow-xl">
-            <div class="flex items-center justify-between p-4 border-b border-gray-100">
-                <h3 class="font-medium text-gray-900">Password Required</h3>
-                <button id="closePasswordModal" class="text-gray-400 hover:text-gray-600 transition-colors">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+    <main id="mainContent">
+        <section id="landingView" class="landing-shell" aria-labelledby="landingTitle">
+            <div class="landing-copy">
+                <h1 id="landingTitle">Merge and arrange PDF pages.</h1>
+                <p>Add PDFs, arrange pages, rotate, remove, or redact them. Processing happens in this browser.</p>
+            </div>
+
+            <div id="dropZone" class="drop-zone" data-state="idle">
+                <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden>
+                <div class="drop-zone__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M12 12v6M9 15h6"/></svg>
+                </div>
+                <h2>Add your PDF files</h2>
+                <p>Drop them here, or choose files from your device.</p>
+                <button id="browseBtn" class="button button--primary" type="button">Choose PDFs</button>
+                <p class="drop-zone__hint">PDF files only · Local processing</p>
+            </div>
+
+            <div class="landing-features" aria-label="How docstack works">
+                <div><span>1</span><strong>Add</strong><p>Choose one or more PDFs.</p></div>
+                <div><span>2</span><strong>Organize</strong><p>Arrange and edit pages visually.</p></div>
+                <div><span>3</span><strong>Download</strong><p>Save one finished PDF.</p></div>
+            </div>
+        </section>
+
+        <section id="workspace" class="workspace hidden" aria-labelledby="workspaceTitle">
+            <div class="workspace-topbar">
+                <div>
+                    <h1 id="workspaceTitle">Arrange your PDF</h1>
+                </div>
+                <div class="workspace-topbar__actions">
+                    <button id="addFilesBtn" class="button button--secondary add-files-button" type="button">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                        Add PDFs
+                    </button>
+                </div>
+            </div>
+
+            <div id="renderProgress" class="progress-panel hidden" role="progressbar" aria-label="Preparing page previews" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div class="progress-panel__label">
+                    <span id="renderProgressText">Preparing previews</span>
+                    <span id="renderProgressPercent">0%</span>
+                </div>
+                <div class="progress-track"><div id="renderProgressBar" class="progress-bar"></div></div>
+            </div>
+
+            <div class="mobile-view-toggle" aria-label="Workspace view">
+                <button id="showDocumentsBtn" type="button" aria-pressed="false">Documents</button>
+                <button id="showPagesBtn" type="button" aria-pressed="true">Pages</button>
+            </div>
+
+            <div class="workspace-grid">
+                <aside id="documentsPanel" class="documents-panel" aria-labelledby="documentsTitle">
+                    <div class="panel-heading">
+                        <div>
+                            <h2 id="documentsTitle">Documents</h2>
+                            <p id="documentCount">0 files</p>
+                        </div>
+                    </div>
+                    <div id="documentList" class="document-list"></div>
+                </aside>
+
+                <section id="pagesPanel" class="pages-panel" aria-labelledby="pagesTitle">
+                    <div class="pages-toolbar">
+                        <div>
+                            <h2 id="pagesTitle">Pages</h2>
+                            <p id="pageCount">0 pages</p>
+                        </div>
+                        <div class="pages-toolbar__actions">
+                            <button id="selectAllBtn" class="button button--quiet" type="button">Select all</button>
+                            <label class="density-control">
+                                <span class="sr-only">Thumbnail size</span>
+                                <select id="densitySelect">
+                                    <option value="comfortable">Comfortable</option>
+                                    <option value="compact">Compact</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="selectionToolbar" class="selection-toolbar hidden" aria-live="polite">
+                        <strong id="selectionCount">0 selected</strong>
+                        <div class="selection-toolbar__actions">
+                            <button id="rotateSelectedBtn" class="selection-action" type="button">
+                                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+                                Rotate 90°
+                            </button>
+                            <button id="deleteSelectedBtn" class="selection-action selection-action--danger" type="button">
+                                <svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zM17 6H7v13h10zM9 17h2V8H9zm4 0h2V8h-2zM7 6v13z"/></svg>
+                                Delete
+                            </button>
+                            <button id="clearSelectionBtn" class="icon-button selection-clear" type="button" aria-label="Clear page selection">
+                                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="pagesEmptyState" class="pages-empty hidden">
+                        <h3>No pages in this composition</h3>
+                        <p>Add another PDF or undo your last deletion.</p>
+                        <button id="emptyAddFilesBtn" class="button button--secondary" type="button">Add PDFs</button>
+                    </div>
+                    <div id="pageGrid" class="page-grid" aria-label="Pages in download order"></div>
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <div id="exportBar" class="export-bar hidden">
+        <div class="export-bar__inner">
+            <div class="history-actions">
+                <button id="undoBtn" class="icon-button" type="button" aria-label="Undo" disabled>
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5"/><path d="M5 12h8a6 6 0 016 6"/></svg>
+                </button>
+                <button id="redoBtn" class="icon-button" type="button" aria-label="Redo" disabled>
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 7l5 5-5 5"/><path d="M19 12h-8a6 6 0 00-6 6"/></svg>
                 </button>
             </div>
-            <div class="p-5">
-                <p id="passwordModalFileName" class="text-sm text-gray-500 mb-4 truncate"></p>
-                <div class="relative">
-                    <input 
-                        type="password" 
-                        id="passwordInput" 
-                        placeholder="Enter PDF password" 
-                        class="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                        autocomplete="off"
-                    >
-                    <button type="button" id="togglePasswordVisibility" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                        <svg id="eyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                        <svg id="eyeOffIcon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                        </svg>
+            <label class="output-name-control">
+                <span>Filename</span>
+                <span class="output-name-input"><input id="outputNameInput" type="text" value="merged" maxlength="120" autocomplete="off"><span>.pdf</span></span>
+            </label>
+            <div class="export-summary"><strong id="exportPageCount">0 pages</strong><span>Ready to download</span></div>
+            <button id="exportBtn" class="button button--primary" type="button">Download PDF</button>
+        </div>
+    </div>
+
+    <div id="pageLightbox" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle">
+        <div class="preview-dialog">
+            <div class="preview-toolbar">
+                <div>
+                    <h2 id="lightboxTitle">Page preview</h2>
+                    <p id="lightboxPosition"></p>
+                </div>
+                <div class="preview-toolbar__actions">
+                    <button id="redactModeBtn" class="button button--danger-quiet" type="button" aria-label="Enter redaction mode" aria-pressed="false">Redact</button>
+                    <button id="clearRedactionsBtn" class="button button--quiet hidden" type="button" aria-label="Clear all redactions">Clear</button>
+                    <button id="closeLightbox" class="icon-button icon-button--inverse" type="button" aria-label="Close page preview">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
                     </button>
                 </div>
-                <p id="passwordError" class="hidden text-red-500 text-xs mt-2">Incorrect password. Please try again.</p>
-                <div class="flex gap-3 mt-4">
-                    <button id="cancelPasswordBtn" class="flex-1 py-2.5 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                        Skip File
-                    </button>
-                    <button id="submitPasswordBtn" class="flex-1 py-2.5 px-4 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
-                        Unlock
-                    </button>
-                </div>
+            </div>
+            <div id="lightboxContent" class="preview-canvas-wrap">
+                <canvas id="lightboxCanvas"></canvas>
+                <canvas id="redactionCanvas" class="redaction-canvas" aria-label="Redaction drawing layer"></canvas>
+            </div>
+            <button id="prevPageBtn" class="preview-nav preview-nav--previous" type="button" aria-label="Previous page">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+            </button>
+            <button id="nextPageBtn" class="preview-nav preview-nav--next" type="button" aria-label="Next page">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="passwordModal" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="passwordTitle">
+        <div class="dialog-card dialog-card--small">
+            <div class="dialog-heading">
+                <div><p class="eyebrow">Protected PDF</p><h2 id="passwordTitle">Enter document password</h2></div>
+                <button id="closePasswordModal" class="icon-button" type="button" aria-label="Skip protected document"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+            </div>
+            <p id="passwordModalFileName" class="dialog-description"></p>
+            <label class="field"><span>Password</span><input id="passwordInput" type="password" autocomplete="current-password" aria-describedby="passwordError"></label>
+            <p id="passwordError" class="field-error hidden" role="alert">That password did not unlock this PDF.</p>
+            <label class="checkbox-row"><input id="showPasswordCheckbox" type="checkbox"> Show password</label>
+            <div class="dialog-actions">
+                <button id="cancelPasswordBtn" class="button button--secondary" type="button">Skip document</button>
+                <button id="submitPasswordBtn" class="button button--primary" type="button">Unlock PDF</button>
             </div>
         </div>
     </div>
 
-    <!-- Encryption Warning Modal -->
-    <div id="encryptionWarningModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-        <div class="bg-white rounded-lg max-w-md w-full overflow-hidden shadow-xl">
-            <div class="flex items-center justify-between p-4 border-b border-gray-100">
-                <h3 class="text-lg font-medium text-gray-900 flex items-center gap-2">
-                    <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    Protected Files Warning
-                </h3>
-            </div>
-            <div class="p-6">
-                <p class="text-base text-gray-600 mb-4">The following files are password-protected:</p>
-                <div id="warningFileList" class="bg-gray-50 rounded-lg p-4 mb-5 text-sm font-mono text-gray-700 max-h-48 overflow-y-auto border border-gray-100"></div>
-                
-                <div class="bg-amber-50 border border-amber-100 rounded-lg p-4 mb-5">
-                    <h4 class="text-sm font-semibold text-amber-800 mb-2">⚠️ Limitation:</h4>
-                    <ul class="text-sm text-amber-700 space-y-1.5 list-disc list-inside">
-                        <li>Text will <strong>NOT</strong> be selectable or searchable</li>
-                        <li>Pages will be embedded as images</li>
-                        <li>Quality may be slightly reduced at high zoom</li>
-                    </ul>
-                </div>
-
-                <p class="text-sm text-gray-500 mb-6">
-                    Tip: For selectable text, remove the password using Adobe or Preview first.
-                </p>
-
-                <div class="flex gap-3">
-                    <button id="cancelWarningBtn" class="flex-1 py-2.5 px-4 border border-gray-300 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                        Go Back
-                    </button>
-                    <button id="proceedWarningBtn" class="flex-1 py-2.5 px-4 bg-gray-900 text-white rounded-lg text-base font-medium hover:bg-gray-800 transition-colors">
-                        Merge Anyway
-                    </button>
-                </div>
+    <div id="encryptionWarningModal" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="encryptionWarningTitle">
+        <div class="dialog-card">
+            <div class="dialog-heading"><div><p class="eyebrow eyebrow--warning">Export notice</p><h2 id="encryptionWarningTitle">Some pages need rasterizing</h2></div></div>
+            <p class="dialog-description">Protected documents will be embedded as high-quality images. Text on those pages will not be searchable or selectable.</p>
+            <ul id="warningFileList" class="warning-file-list"></ul>
+            <div class="dialog-actions">
+                <button id="cancelWarningBtn" class="button button--secondary" type="button">Go back</button>
+                <button id="proceedWarningBtn" class="button button--primary" type="button">Continue download</button>
             </div>
         </div>
     </div>
 
-    <!-- Redaction Warning Modal -->
-    <div id="redactionWarningModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4 sm:p-6">
-        <div class="bg-white rounded-lg max-w-md w-full overflow-hidden shadow-xl mx-2">
-            <div class="flex items-center justify-between p-3 sm:p-4 border-b border-gray-100">
-                <h3 class="text-base sm:text-lg font-medium text-gray-900 flex items-center gap-2">
-                    <svg class="w-5 h-5 sm:w-6 sm:h-6 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                    Redaction Mode
-                </h3>
-            </div>
-            <div class="p-4 sm:p-6">
-                <p class="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4">You are about to enter redaction mode.</p>
-                
-                <div class="bg-amber-50 border border-amber-100 rounded-lg p-3 sm:p-4 mb-4 sm:mb-5">
-                    <h4 class="text-xs sm:text-sm font-semibold text-amber-800 mb-2">⚠️ Important:</h4>
-                    <ul class="text-xs sm:text-sm text-amber-700 space-y-1 sm:space-y-1.5 list-disc list-inside">
-                        <li>Redacted pages will be converted to images</li>
-                        <li>Text on those pages will <strong>NOT</strong> be selectable</li>
-                        <li>Search won't find text on those pages</li>
-                    </ul>
-                </div>
-
-                <p class="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
-                    This ensures the redacted content cannot be recovered or extracted.
-                </p>
-
-                <div class="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
-                    <button id="cancelRedactionBtn" class="flex-1 py-2.5 px-4 border border-gray-300 rounded-lg text-sm sm:text-base font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors">
-                        Cancel
-                    </button>
-                    <button id="proceedRedactionBtn" class="flex-1 py-2.5 px-4 bg-red-600 text-white rounded-lg text-sm sm:text-base font-medium hover:bg-red-700 active:bg-red-800 transition-colors">
-                        Enter Redact Mode
-                    </button>
-                </div>
+    <div id="redactionWarningModal" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="redactionWarningTitle">
+        <div class="dialog-card">
+            <div class="dialog-heading"><div><p class="eyebrow eyebrow--danger">Permanent edit</p><h2 id="redactionWarningTitle">Redaction rasterizes this page</h2></div></div>
+            <p class="dialog-description">Draw over content you want removed. The downloaded page becomes an image so covered content cannot be selected or extracted.</p>
+            <div class="dialog-actions">
+                <button id="cancelRedactionBtn" class="button button--secondary" type="button">Cancel</button>
+                <button id="proceedRedactionBtn" class="button button--danger" type="button">Enter redaction mode</button>
             </div>
         </div>
     </div>
 
-    <!-- Help Modal -->
-    <div id="helpModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-        <div class="bg-white rounded-lg max-w-md w-full overflow-hidden shadow-xl">
-            <div class="flex items-center justify-between p-4 border-b border-gray-100">
-                <h3 class="font-medium text-gray-900">Page Selection Syntax</h3>
-                <button id="closeHelpModal" class="text-gray-400 hover:text-gray-600 transition-colors">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+    <div id="helpModal" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <div class="dialog-card">
+            <div class="dialog-heading">
+                <div><p class="eyebrow">Help</p><h2 id="helpTitle">Processing and workflow</h2></div>
+                <button id="closeHelpModal" class="icon-button" type="button" aria-label="Close help"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
             </div>
-            <div class="p-5 text-sm">
-                <p class="text-gray-500 mb-4">Leave empty to include all pages, or use these rules:</p>
-                
-                <div class="space-y-3">
-                    <div class="flex items-center gap-3">
-                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono min-w-[80px]">1..3</code>
-                        <span class="text-gray-600">Pages 1 through 3</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono min-w-[80px]">1, 3, 5</code>
-                        <span class="text-gray-600">Pages 1, 3, and 5</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono min-w-[80px]">-1</code>
-                        <span class="text-gray-600">Last page</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono min-w-[80px]">2..</code>
-                        <span class="text-gray-600">Page 2 to end</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono min-w-[80px]">3..1</code>
-                        <span class="text-gray-600">Pages 3 to 1 (reverse)</span>
-                    </div>
-                </div>
+            <div class="help-content">
+                <p>docstack processes PDFs in this browser tab. Files are not uploaded.</p>
+                <h3>Quick workflow</h3>
+                <ol><li>Add PDFs.</li><li>Drag pages or use their move buttons.</li><li>Select pages for bulk rotate or delete.</li><li>Preview redactions, choose a filename, and download.</li></ol>
             </div>
         </div>
     </div>
 
-    <!-- Application Entry Point -->
+    <div id="exportProgressModal" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="exportProgressTitle">
+        <div class="dialog-card dialog-card--small">
+            <div class="processing-indicator" aria-hidden="true"></div>
+            <h2 id="exportProgressTitle">Preparing your PDF</h2>
+            <p id="exportProgressText" class="dialog-description" aria-live="polite">Starting export…</p>
+            <div id="exportProgressIndicator" class="progress-track" role="progressbar" aria-label="PDF export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="exportProgressBar" class="progress-bar"></div></div>
+            <button id="cancelExportBtn" class="button button--secondary w-full" type="button">Cancel export</button>
+        </div>
+    </div>
+
     <script type="module" src="js/app.js"></script>
 </body>
 </html>

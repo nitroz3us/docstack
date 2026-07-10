@@ -1,75 +1,44 @@
-/**
- * docstack PDF Utilities
- * 
- * Handles PDF.js rendering and related operations
- */
+/** PDF.js loading and rendering helpers. */
 
-// PDF.js library reference (set during initialization)
-let pdfjsLib = null;
+let pdfJsPromise = null;
 
-/**
- * Initialize PDF.js library
- * @param {Object} pdfjs - PDF.js library object
- */
-export function initPdfLib(pdfjs) {
-    pdfjsLib = pdfjs;
-}
-
-/**
- * Render a PDF page to a canvas
- * @param {Object} pdfDoc - PDF.js document proxy
- * @param {number} pageNum - Page number (1-indexed)
- * @param {HTMLCanvasElement} canvas - Target canvas
- * @param {number} scale - Render scale (default 0.5)
- * @returns {Promise<boolean>} - Success status
- */
-export async function renderPdfPage(pdfDoc, pageNum, canvas, scale = 0.5) {
-    try {
-        // PDF.js pages are 1-indexed
-        const page = await pdfDoc.getPage(pageNum);
-
-        const viewport = page.getViewport({ scale });
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-
-        const ctx = canvas.getContext('2d');
-        await page.render({ canvasContext: ctx, viewport }).promise;
-
-        return true;
-    } catch (error) {
-        console.error('Error rendering PDF:', error);
-        return false;
+export async function ensurePdfJs() {
+    if (!pdfJsPromise) {
+        pdfJsPromise = import('../../lib/pdf.min.mjs').then(pdfjs => {
+            pdfjs.GlobalWorkerOptions.workerSrc = new URL('../../lib/pdf.worker.min.mjs', import.meta.url).href;
+            return pdfjs;
+        });
     }
+    return pdfJsPromise;
 }
 
-/**
- * Load a PDF document from ArrayBuffer
- * @param {ArrayBuffer} arrayBuffer - PDF file data
- * @param {string} [password] - Optional password for encrypted PDFs
- * @returns {Promise<Object>} - PDF.js document proxy
- */
+export async function renderPdfPage(pdfDocument, pageNumber, canvas, options = {}) {
+    const { scale = 0.5, rotation = 0 } = typeof options === 'number'
+        ? { scale: options, rotation: 0 }
+        : options;
+    const page = await pdfDocument.getPage(pageNumber);
+    const viewport = page.getViewport({ scale, rotation });
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const context = canvas.getContext('2d', { alpha: false });
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: context, viewport }).promise;
+    return viewport;
+}
+
 export async function loadPdfDocument(arrayBuffer, password = null) {
-    if (!pdfjsLib) {
-        throw new Error('PDF.js library not initialized');
-    }
-
-    // Create a copy of the buffer to avoid detached buffer issues
-    const loadingParams = { data: arrayBuffer.slice(0) };
-
-    // Add password if provided
-    if (password) {
-        loadingParams.password = password;
-    }
-
-    const loadingTask = pdfjsLib.getDocument(loadingParams);
-    return loadingTask.promise;
+    const pdfjs = await ensurePdfJs();
+    const params = { data: arrayBuffer.slice(0) };
+    if (password) params.password = password;
+    return pdfjs.getDocument(params).promise;
 }
 
-/**
- * Get page count from a PDF proxy
- * @param {Object} pdfProxy 
- * @returns {number}
- */
 export function getPageCount(pdfProxy) {
     return pdfProxy.numPages;
+}
+
+export async function hasPdfSignature(file) {
+    const prefix = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+    return String.fromCharCode(...prefix) === '%PDF-';
 }
