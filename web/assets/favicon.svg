@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#0f172a"/>
-  <path d="M20 16h19l7 7v25H20z" fill="#fff" opacity=".65"/>
-  <path d="M16 20h19l7 7v21H16z" fill="#fff"/>
-  <path d="M35 20v8h7" fill="none" stroke="#0f172a" stroke-width="3" stroke-linejoin="round"/>
-  <path d="M23 34h12M23 40h12" stroke="#0f172a" stroke-width="3" stroke-linecap="round"/>
+  <!-- Two stacked sheets, matching the header logo: an outlined sheet behind a solid one. -->
+  <rect width="64" height="64" rx="14" fill="#18181b"/>
+  <rect x="14" y="11" width="24" height="31" rx="3" fill="none" stroke="#ffffff" stroke-opacity=".6" stroke-width="3.5"/>
+  <rect x="26" y="22" width="24" height="31" rx="3" fill="#ffffff"/>
 </svg>

@@ -6,7 +6,7 @@ import * as state from '../state.js';
 
 let pdfLibPromise = null;
 
-function ensurePdfLib() {
+export function ensurePdfLib() {
     if (window.PDFLib) return Promise.resolve(window.PDFLib);
     if (pdfLibPromise) return pdfLibPromise;
 
@@ -124,9 +124,10 @@ function triggerDownload(bytes, name) {
  * @param {(progress: {stage: string, current: number, total: number}) => void} [options.onProgress]
  * @param {(files: Array<Object>) => Promise<boolean>} [options.onRestrictedFiles]
  * @param {AbortSignal} [options.signal]
+ * @param {Array<string>} [options.pageIds] - download only these pages instead of the whole document
  */
-export async function mergePDFs({ onProgress, onRestrictedFiles, signal } = {}) {
-    const plan = state.getMergePlan();
+export async function mergePDFs({ onProgress, onRestrictedFiles, signal, pageIds } = {}) {
+    const plan = state.getMergePlan(pageIds);
     if (plan.pages.length === 0) throw new Error('Add at least one page before exporting.');
     if (plan.errors.length > 0) throw new Error(plan.errors.join(' '));
 

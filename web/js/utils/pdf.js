@@ -5,7 +5,14 @@ let pdfJsPromise = null;
 export async function ensurePdfJs() {
     if (!pdfJsPromise) {
         pdfJsPromise = import('../../lib/pdf.min.mjs').then(pdfjs => {
-            pdfjs.GlobalWorkerOptions.workerSrc = new URL('../../lib/pdf.worker.min.mjs', import.meta.url).href;
+            const workerUrl = new URL('../../lib/pdf.worker.min.mjs', import.meta.url);
+            pdfjs.GlobalWorkerOptions.workerSrc = workerUrl.href;
+            // Start one shared worker now, so its code is already loaded if the connection drops later.
+            try {
+                pdfjs.GlobalWorkerOptions.workerPort = new Worker(workerUrl, { type: 'module' });
+            } catch {
+                // Fall back to pdf.js starting its own worker from workerSrc when a document opens.
+            }
             return pdfjs;
         });
     }

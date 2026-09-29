@@ -52,3 +52,110 @@ test('redactions are normalized and clamped to the final page orientation', () =
     assert.ok(Math.abs(rect.width - 0.1) < Number.EPSILON);
     assert.ok(Math.abs(rect.height - 0.2) < Number.EPSILON);
 });
+
+test('rotating a page keeps its redactions over the same content', () => {
+    state.addFile(file('a', 1));
+    const pageId = state.compositionPages[0].id;
+    state.addRedaction(pageId, { x: 0.1, y: 0.2, width: 0.3, height: 0.1 });
+    state.rotatePages([pageId]);
+
+    const rect = state.getPage(pageId).redactions[0];
+    assert.ok(Math.abs(rect.x - 0.7) < 1e-9);
+    assert.ok(Math.abs(rect.y - 0.1) < 1e-9);
+    assert.ok(Math.abs(rect.width - 0.1) < 1e-9);
+    assert.ok(Math.abs(rect.height - 0.3) < 1e-9);
+
+    state.rotatePages([pageId], 270);
+    const restored = state.getPage(pageId).redactions[0];
+    assert.ok(Math.abs(restored.x - 0.1) < 1e-9);
+    assert.ok(Math.abs(restored.y - 0.2) < 1e-9);
+});
+
+test('each document gets a distinct color that is reused after removal', () => {
+    state.addFile(file('a', 1));
+    state.addFile(file('b', 1));
+    assert.equal(state.getFile('a').colorIndex, 0);
+    assert.equal(state.getFile('b').colorIndex, 1);
+    state.removeFile('a');
+    state.addFile(file('c', 1));
+    assert.equal(state.getFile('c').colorIndex, 0);
+});
+
+test('moving a selection nudges each page past its unselected neighbour', () => {
+    state.addFile(file('a', 5));
+    const ids = state.compositionPages.map(page => page.id);
+    assert.equal(state.movePages([ids[1], ids[3]], -1), true);
+    assert.deepEqual(state.compositionPages.map(page => page.id), [ids[1], ids[0], ids[3], ids[2], ids[4]]);
+    assert.equal(state.movePages([ids[1]], -1), false, 'already first');
+    state.movePages([ids[1], ids[3]], 1);
+    assert.deepEqual(state.compositionPages.map(page => page.id), ids);
+});
+
+test('moving pages to the start or end keeps every other page in place', () => {
+    state.addFile(file('a', 3));
+    state.addFile(file('b', 2));
+    const ids = state.compositionPages.map(page => page.id);
+    // Interleave so a file-level regroup would be detectable.
+    state.setPageOrder([ids[0], ids[3], ids[1], ids[2], ids[4]]);
+    assert.equal(state.movePagesTo([ids[1], ids[2]], 'start'), true);
+    assert.deepEqual(state.compositionPages.map(page => page.id), [ids[1], ids[2], ids[0], ids[3], ids[4]]);
+    assert.equal(state.movePagesTo([ids[1], ids[2]], 'start'), false, 'already at the start');
+    state.movePagesTo([ids[0]], 'end');
+    assert.deepEqual(state.compositionPages.map(page => page.id), [ids[1], ids[2], ids[3], ids[4], ids[0]]);
+});
+
+test('deleting pages can carry a descriptive history label', () => {
+    state.addFile(file('a', 2));
+    state.deletePages(state.compositionPages.map(page => page.id), 'Removed a.pdf');
+    assert.equal(state.compositionPages.length, 0);
+    assert.equal(state.undo(), 'Removed a.pdf');
+    assert.equal(state.compositionPages.length, 2);
+});
+
+test('a merge plan can be limited to selected pages in document order', () => {
+    state.addFile(file('a', 4));
+    const ids = state.compositionPages.map(page => page.id);
+    const plan = state.getMergePlan([ids[3], ids[1]]);
+    assert.deepEqual(plan.pages.map(page => page.id), [ids[1], ids[3]]);
+    assert.equal(plan.name, 'merged-selected.pdf');
+    assert.equal(state.getMergePlan().name, 'merged.pdf');
+});
+
+test('starting over clears everything in one undoable step', () => {
+    state.addFile(file('a', 2));
+    state.addFile(file('b', 1));
+    assert.equal(state.clearAll(), true);
+    assert.equal(state.hasFiles(), false);
+    assert.equal(state.compositionPages.length, 0);
+    state.undo();
+    assert.equal(state.uploadedFiles.length, 2);
+    assert.equal(state.compositionPages.length, 3);
+});
+
+test('a single redaction can be removed and restored', () => {
+    state.addFile(file('a', 1));
+    const pageId = state.compositionPages[0].id;
+    state.addRedaction(pageId, { x: 0.1, y: 0.1, width: 0.2, height: 0.1 });
+    state.addRedaction(pageId, { x: 0.5, y: 0.5, width: 0.2, height: 0.1 });
+    assert.equal(state.removeRedaction(pageId, 0), true);
+    assert.deepEqual(state.getPage(pageId).redactions.map(rect => rect.x), [0.5]);
+    assert.equal(state.removeRedaction(pageId, 5), false);
+    state.undo();
+    assert.equal(state.getPage(pageId).redactions.length, 2);
+});
+
+test('files and extra pages can be inserted at a position', () => {
+    state.addFile(file('a', 3));
+    const [first, second, third] = state.compositionPages.map(page => page.id);
+    const inserted = state.addFile(file('b', 2), { insertAt: 1 });
+    assert.deepEqual(state.compositionPages.map(page => page.id), [first, inserted[0].id, inserted[1].id, second, third]);
+
+    const blank = { ...file('blank', 1), isBlank: true };
+    state.addFile(blank, { insertAt: 0, label: 'Inserted a blank page' });
+    assert.equal(state.getFile('blank').colorIndex, null, 'blank pages do not take a file colour');
+    const [extra] = state.insertSourcePages('blank', [0], 99, 'Inserted a blank page');
+    assert.equal(state.compositionPages.at(-1).id, extra.id, 'positions past the end append');
+    assert.equal(state.compositionPages.filter(page => page.sourceFileId === 'blank').length, 2);
+    assert.deepEqual(state.insertSourcePages('blank', [3], 0), [], 'invalid source pages are rejected');
+    assert.equal(state.undo(), 'Inserted a blank page');
+});

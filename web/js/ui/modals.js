@@ -1,5 +1,8 @@
 import * as state from '../state.js';
 import { renderPdfPage } from '../utils/pdf.js';
+import { showToast } from './toast.js';
+import { drawPageThumbnail } from './thumbnails.js';
+import { renderThumbnailRedactions } from './components.js';
 
 let elements = null;
 const dialogStack = [];
@@ -8,9 +11,19 @@ let encryptionResolve = null;
 let redactionResolve = null;
 let currentPageId = null;
 let isRedactMode = false;
-let isDrawing = false;
-let drawStart = null;
+let drawing = null;
+let selectedRedaction = null;
+let filmstripKey = null;
+let filmstripObserver = null;
+let swipe = null;
+let shownPageId = null;
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let redactionWarningAcknowledged = false;
+let renderToken = 0;
+let lightboxCloseHandler = null;
+let renderedKey = null;
+const ZOOM_LEVELS = [1, 1.25, 1.5, 2, 3];
+let zoomIndex = 0;
 
 const focusableSelector = [
     'button:not([disabled])',
@@ -153,36 +166,229 @@ function hideRedactionWarningModal(proceed) {
     redactionResolve = null;
 }
 
-function syncRedactionCanvas() {
-    const canvasRect = elements.lightboxCanvas.getBoundingClientRect();
-    const contentRect = elements.lightboxContent.getBoundingClientRect();
-    const overlay = elements.redactionCanvas;
-    overlay.style.left = `${canvasRect.left - contentRect.left}px`;
-    overlay.style.top = `${canvasRect.top - contentRect.top}px`;
-    overlay.style.width = `${canvasRect.width}px`;
-    overlay.style.height = `${canvasRect.height}px`;
-    overlay.width = Math.max(1, Math.round(canvasRect.width));
-    overlay.height = Math.max(1, Math.round(canvasRect.height));
+/* ---------- Redaction boxes ---------- */
+
+function describeBoxCount(count) {
+    if (count === 0) return 'No boxes yet';
+    return `${count} box${count === 1 ? '' : 'es'}`;
 }
 
-function renderRedactionOverlay(previewRect = null) {
-    syncRedactionCanvas();
+/** Boxes are elements over the page, stored as fractions of the page, so they scale with zoom. */
+function renderRedactionBoxes() {
     const page = state.getPage(currentPageId);
-    const overlay = elements.redactionCanvas;
-    const context = overlay.getContext('2d');
-    context.clearRect(0, 0, overlay.width, overlay.height);
-    context.fillStyle = '#000000';
-    page?.redactions.forEach(rect => {
-        context.fillRect(rect.x * overlay.width, rect.y * overlay.height, rect.width * overlay.width, rect.height * overlay.height);
+    const layer = elements.redactionLayer;
+    const redactions = page?.redactions || [];
+    if (selectedRedaction !== null && selectedRedaction >= redactions.length) selectedRedaction = null;
+
+    const fragment = document.createDocumentFragment();
+    redactions.forEach((rect, index) => {
+        const box = document.createElement('div');
+        box.className = `redaction-box${index === selectedRedaction ? ' redaction-box--selected' : ''}`;
+        box.dataset.index = String(index);
+        Object.assign(box.style, {
+            left: `${rect.x * 100}%`,
+            top: `${rect.y * 100}%`,
+            width: `${rect.width * 100}%`,
+            height: `${rect.height * 100}%`,
+        });
+        if (isRedactMode) {
+            box.tabIndex = 0;
+            box.setAttribute('role', 'button');
+            box.setAttribute('aria-pressed', String(index === selectedRedaction));
+            box.setAttribute('aria-label', `Redaction ${index + 1} of ${redactions.length}`);
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'redaction-box__remove';
+            remove.dataset.removeRedaction = String(index);
+            remove.setAttribute('aria-label', `Remove redaction ${index + 1}`);
+            remove.title = 'Remove (Delete)';
+            remove.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+            box.appendChild(remove);
+        }
+        fragment.appendChild(box);
     });
-    if (previewRect) {
-        context.fillStyle = 'rgba(0, 0, 0, 0.55)';
-        context.strokeStyle = '#ef4444';
-        context.lineWidth = 2;
-        context.fillRect(previewRect.x, previewRect.y, previewRect.width, previewRect.height);
-        context.strokeRect(previewRect.x, previewRect.y, previewRect.width, previewRect.height);
+    layer.replaceChildren(fragment);
+
+    elements.redactionCount.textContent = describeBoxCount(redactions.length);
+    elements.undoLastRedactionBtn.disabled = redactions.length === 0;
+    elements.clearRedactionsBtn.disabled = redactions.length === 0;
+}
+
+function selectRedaction(index, { focus = false } = {}) {
+    selectedRedaction = index;
+    renderRedactionBoxes();
+    if (focus && index !== null) elements.redactionLayer.querySelector(`[data-index="${index}"]`)?.focus();
+}
+
+function removeRedactionAt(index) {
+    const count = state.getPage(currentPageId)?.redactions.length ?? 0;
+    if (index === null || index >= count) return;
+    selectedRedaction = null;
+    state.removeRedaction(currentPageId, index);
+    // State changes re-render synchronously, so the layer is current here. Keep keyboard users
+    // in the layer by selecting the box that took this one's place.
+    const next = Math.min(index, count - 2);
+    if (next >= 0) selectRedaction(next, { focus: true });
+    else elements.redactModeBtn.focus();
+}
+
+function layerPosition(event) {
+    const rect = elements.redactionLayer.getBoundingClientRect();
+    return {
+        x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+        y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
+        pixelWidth: rect.width,
+        pixelHeight: rect.height,
+    };
+}
+
+function boxBetween(start, end) {
+    return {
+        x: Math.min(start.x, end.x),
+        y: Math.min(start.y, end.y),
+        width: Math.abs(end.x - start.x),
+        height: Math.abs(end.y - start.y),
+    };
+}
+
+function startRedaction(event) {
+    if (!isRedactMode || event.button !== 0) return;
+    if (event.target.closest('.redaction-box__remove')) return;
+    const box = event.target.closest('.redaction-box');
+    event.preventDefault();
+    if (box) {
+        selectRedaction(Number(box.dataset.index), { focus: true });
+        return;
     }
-    elements.clearRedactionsBtn.classList.toggle('hidden', !page?.redactions.length);
+    if (selectedRedaction !== null) selectRedaction(null);
+    const start = layerPosition(event);
+    const preview = document.createElement('div');
+    preview.className = 'redaction-box redaction-box--drawing';
+    elements.redactionLayer.appendChild(preview);
+    drawing = { start, preview };
+    elements.redactionLayer.setPointerCapture?.(event.pointerId);
+}
+
+function moveRedaction(event) {
+    if (!drawing) return;
+    const rect = boxBetween(drawing.start, layerPosition(event));
+    Object.assign(drawing.preview.style, {
+        left: `${rect.x * 100}%`,
+        top: `${rect.y * 100}%`,
+        width: `${rect.width * 100}%`,
+        height: `${rect.height * 100}%`,
+    });
+}
+
+function endRedaction(event) {
+    if (!drawing) return;
+    const end = layerPosition(event);
+    const rect = boxBetween(drawing.start, end);
+    drawing.preview.remove();
+    drawing = null;
+    // Ignore accidental clicks: a box must be at least a few pixels in each direction.
+    if (rect.width * end.pixelWidth >= 6 && rect.height * end.pixelHeight >= 6) {
+        state.addRedaction(currentPageId, rect);
+    }
+}
+
+function setRedactMode(active) {
+    isRedactMode = active;
+    selectedRedaction = null;
+    drawing?.preview.remove();
+    drawing = null;
+    elements.redactModeBtn.setAttribute('aria-pressed', String(active));
+    elements.redactionLayer.classList.toggle('redaction-layer--active', active);
+    elements.redactionBanner.classList.toggle('hidden', !active);
+    elements.pageLightbox.classList.toggle('viewer--redacting', active);
+    renderRedactionBoxes();
+    // The banner changes the stage height, so refit the page (reading layout forces the reflow).
+    applyZoom();
+}
+
+async function toggleRedactMode() {
+    if (!isRedactMode && !await showRedactionWarningModal()) return;
+    setRedactMode(!isRedactMode);
+}
+
+/* ---------- Filmstrip ---------- */
+
+function renderFilmstrip() {
+    const pages = state.compositionPages;
+    // Rebuild only when pages are added, removed, reordered or rotated; redaction marks update in place.
+    const key = pages.map(page => `${page.id}:${page.rotation}`).join('|');
+    if (key !== filmstripKey) {
+        filmstripKey = key;
+        filmstripObserver?.disconnect();
+        filmstripObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                filmstripObserver.unobserve(entry.target);
+                const page = state.getPage(entry.target.dataset.pageId);
+                const file = page && state.getFile(page.sourceFileId);
+                if (page && file) drawPageThumbnail(entry.target.querySelector('canvas'), page, file).catch(() => {});
+            });
+        }, { root: elements.lightboxFilmstrip, rootMargin: '300px' });
+
+        const fragment = document.createDocumentFragment();
+        pages.forEach((page, index) => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'filmstrip__item';
+            item.dataset.pageId = page.id;
+            const thumb = document.createElement('span');
+            thumb.className = 'filmstrip__thumb';
+            const canvas = document.createElement('canvas');
+            const sideways = page.rotation % 180 !== 0;
+            canvas.width = sideways ? 22 : 17;
+            canvas.height = sideways ? 17 : 22;
+            canvas.dataset.rendered = 'false';
+            // The paper wrapper hugs the canvas so redaction boxes line up with the page.
+            const paper = document.createElement('span');
+            paper.className = 'filmstrip__paper';
+            paper.appendChild(canvas);
+            thumb.appendChild(paper);
+            const number = document.createElement('span');
+            number.className = 'filmstrip__number';
+            number.textContent = String(index + 1);
+            item.append(thumb, number);
+            fragment.appendChild(item);
+            filmstripObserver.observe(item);
+        });
+        elements.lightboxFilmstrip.replaceChildren(fragment);
+    }
+
+    elements.lightboxFilmstrip.querySelectorAll('.filmstrip__item').forEach((item, index) => {
+        const redactions = state.getPage(item.dataset.pageId)?.redactions || [];
+        const redacted = redactions.length > 0;
+        renderThumbnailRedactions(item.querySelector('.filmstrip__paper'), redactions);
+        item.setAttribute('aria-label', `Page ${index + 1}${redacted ? ', redacted' : ''}`);
+        if (item.dataset.pageId === currentPageId) item.setAttribute('aria-current', 'page');
+        else item.removeAttribute('aria-current');
+    });
+    elements.lightboxFilmstrip.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function isLightboxOpen() {
+    return Boolean(currentPageId) && !elements.pageLightbox.classList.contains('hidden');
+}
+
+/** Size the rendered canvas: fit inside the stage, or a multiple of that fit when zoomed. */
+function applyZoom() {
+    const canvas = elements.lightboxCanvas;
+    const zoom = ZOOM_LEVELS[zoomIndex];
+    const zoomed = zoomIndex > 0;
+    elements.lightboxContent.classList.toggle('preview-canvas-wrap--zoomed', zoomed);
+    elements.zoomFitBtn.textContent = zoomed ? `${Math.round(zoom * 100)}%` : 'Fit';
+    elements.zoomOutBtn.disabled = !zoomed;
+    elements.zoomInBtn.disabled = zoomIndex === ZOOM_LEVELS.length - 1;
+    if (!canvas.width || !canvas.height) return;
+    const content = elements.lightboxContent;
+    const styles = getComputedStyle(content);
+    const availableWidth = content.clientWidth - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight);
+    const availableHeight = content.clientHeight - parseFloat(styles.paddingTop) - parseFloat(styles.paddingBottom);
+    const fitRatio = Math.min(availableWidth / canvas.width, availableHeight / canvas.height);
+    canvas.style.width = `${Math.max(80, Math.floor(canvas.width * fitRatio * zoom))}px`;
 }
 
 async function renderLightboxPage() {
@@ -192,29 +398,91 @@ async function renderLightboxPage() {
     const position = state.compositionPages.findIndex(item => item.id === page.id);
     elements.lightboxTitle.textContent = file.name;
     elements.lightboxPosition.textContent = `Page ${position + 1} of ${state.compositionPages.length} · source page ${page.sourcePageIndex + 1}`;
-    await renderPdfPage(file.pdfProxy, page.sourcePageIndex + 1, elements.lightboxCanvas, {
-        scale: 1.5,
-        rotation: page.rotation,
-    });
     elements.prevPageBtn.disabled = position <= 0;
     elements.nextPageBtn.disabled = position >= state.compositionPages.length - 1;
-    window.requestAnimationFrame(() => renderRedactionOverlay());
+    renderFilmstrip();
+
+    const renderScale = Math.min(4, 1.5 * ZOOM_LEVELS[zoomIndex]) * Math.min(2, window.devicePixelRatio || 1);
+    const key = `${page.id}:${page.rotation}:${renderScale}`;
+    if (key === renderedKey) {
+        applyZoom();
+        renderRedactionBoxes();
+        return;
+    }
+
+    // Render off-screen so the previous page stays visible until the new one is ready.
+    const token = ++renderToken;
+    const spinnerTimer = window.setTimeout(() => elements.lightboxSpinner.classList.remove('hidden'), 120);
+    const buffer = document.createElement('canvas');
+    try {
+        await renderPdfPage(file.pdfProxy, page.sourcePageIndex + 1, buffer, {
+            scale: renderScale,
+            rotation: page.rotation,
+        });
+    } catch (error) {
+        if (token === renderToken) showToast('This page could not be displayed.', { tone: 'error' });
+        return;
+    } finally {
+        window.clearTimeout(spinnerTimer);
+        if (token === renderToken) elements.lightboxSpinner.classList.add('hidden');
+    }
+    if (token !== renderToken || !isLightboxOpen()) return;
+
+    const canvas = elements.lightboxCanvas;
+    canvas.width = buffer.width;
+    canvas.height = buffer.height;
+    canvas.getContext('2d', { alpha: false }).drawImage(buffer, 0, 0);
+    canvas.classList.remove('preview-canvas--empty');
+    renderedKey = key;
+    applyZoom();
+    renderRedactionBoxes();
+    // A short fade marks a change of page (not a zoom or rotation of the same page).
+    if (shownPageId && shownPageId !== page.id && !reducedMotion.matches) {
+        elements.lightboxPage.animate([{ opacity: 0.3 }, { opacity: 1 }], { duration: 170, easing: 'ease-out' });
+    }
+    shownPageId = page.id;
 }
 
 export async function showPageLightbox(pageId, trigger) {
     if (!state.getPage(pageId)) return;
     currentPageId = pageId;
+    zoomIndex = 0;
+    renderedKey = null;
+    elements.lightboxCanvas.classList.add('preview-canvas--empty');
+    filmstripKey = null;
     openDialog(elements.pageLightbox, trigger, {
         initialFocus: elements.closeLightbox,
-        escape: hideLightbox,
+        // Escape steps back one level: deselect a box, then leave redaction, then close.
+        escape: () => {
+            if (isRedactMode && selectedRedaction !== null) selectRedaction(null);
+            else if (isRedactMode) setRedactMode(false);
+            else hideLightbox();
+        },
     });
     await renderLightboxPage();
 }
 
 export function hideLightbox() {
+    const closedPageId = currentPageId;
     setRedactMode(false);
-    closeDialog(elements.pageLightbox);
+    closeDialog(elements.pageLightbox, { restoreFocus: !lightboxCloseHandler });
     currentPageId = null;
+    lightboxCloseHandler?.(closedPageId);
+    renderedKey = null;
+    renderToken++;
+    filmstripObserver?.disconnect();
+    filmstripKey = null;
+    shownPageId = null;
+}
+
+/** Keep the open preview in sync after any state change (rotate, delete, undo, redo). */
+export function refreshLightbox() {
+    if (!isLightboxOpen()) return;
+    if (!state.getPage(currentPageId)) {
+        hideLightbox();
+        return;
+    }
+    renderLightboxPage();
 }
 
 async function changeLightboxPage(delta) {
@@ -223,70 +491,30 @@ async function changeLightboxPage(delta) {
     if (!next) return;
     setRedactMode(false);
     currentPageId = next.id;
+    elements.lightboxContent.scrollTo(0, 0);
     await renderLightboxPage();
 }
 
-function setRedactMode(active) {
-    isRedactMode = active;
-    elements.redactModeBtn.setAttribute('aria-pressed', String(active));
-    elements.redactModeBtn.setAttribute('aria-label', active ? 'Finish redacting' : 'Enter redaction mode');
-    elements.redactModeBtn.textContent = active ? 'Done' : 'Redact';
-    elements.redactionCanvas.classList.toggle('redaction-canvas--active', active);
+function setZoom(nextIndex) {
+    const clamped = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, nextIndex));
+    if (clamped === zoomIndex) return;
+    zoomIndex = clamped;
+    renderLightboxPage();
 }
 
-async function toggleRedactMode() {
-    if (!isRedactMode && !await showRedactionWarningModal()) return;
-    setRedactMode(!isRedactMode);
+function rotatePreviewPage() {
+    state.rotatePages([currentPageId]);
 }
 
-function pointerPosition(event) {
-    const rect = elements.redactionCanvas.getBoundingClientRect();
-    return {
-        x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
-        y: Math.max(0, Math.min(rect.height, event.clientY - rect.top)),
-        width: rect.width,
-        height: rect.height,
-    };
-}
-
-function startRedaction(event) {
-    if (!isRedactMode) return;
-    event.preventDefault();
-    isDrawing = true;
-    drawStart = pointerPosition(event);
-    elements.redactionCanvas.setPointerCapture?.(event.pointerId);
-}
-
-function moveRedaction(event) {
-    if (!isDrawing) return;
-    const current = pointerPosition(event);
-    renderRedactionOverlay({
-        x: Math.min(drawStart.x, current.x),
-        y: Math.min(drawStart.y, current.y),
-        width: Math.abs(current.x - drawStart.x),
-        height: Math.abs(current.y - drawStart.y),
-    });
-}
-
-function endRedaction(event) {
-    if (!isDrawing) return;
-    isDrawing = false;
-    const current = pointerPosition(event);
-    const rect = {
-        x: Math.min(drawStart.x, current.x),
-        y: Math.min(drawStart.y, current.y),
-        width: Math.abs(current.x - drawStart.x),
-        height: Math.abs(current.y - drawStart.y),
-    };
-    if (rect.width >= 6 && rect.height >= 6) {
-        state.addRedaction(currentPageId, {
-            x: rect.x / current.width,
-            y: rect.y / current.height,
-            width: rect.width / current.width,
-            height: rect.height / current.height,
-        });
-    }
-    renderRedactionOverlay();
+function deletePreviewPage() {
+    const index = state.compositionPages.findIndex(page => page.id === currentPageId);
+    const neighbor = state.compositionPages[index + 1] || state.compositionPages[index - 1];
+    const deletedId = currentPageId;
+    setRedactMode(false);
+    // Move to the neighbour first so the state-change refresh shows it instead of closing.
+    if (neighbor) currentPageId = neighbor.id;
+    state.deletePage(deletedId);
+    if (!neighbor) hideLightbox();
 }
 
 export function showExportProgress() {
@@ -310,11 +538,12 @@ export function hideExportProgress() {
     closeDialog(elements.exportProgressModal);
 }
 
-export function initModals(domElements) {
+export function initModals(domElements, { onLightboxClose } = {}) {
     elements = domElements;
+    lightboxCloseHandler = onLightboxClose || null;
     document.addEventListener('keydown', handleDialogKeydown, true);
     window.addEventListener('resize', () => {
-        if (currentPageId) window.requestAnimationFrame(() => renderRedactionOverlay());
+        if (currentPageId) applyZoom();
     });
 
     elements.closePasswordModal.addEventListener('click', () => hidePasswordModal(null));
@@ -339,20 +568,97 @@ export function initModals(domElements) {
     setupBackdropCancel(elements.redactionWarningModal, () => hideRedactionWarningModal(false));
 
     elements.closeLightbox.addEventListener('click', hideLightbox);
+    setupBackdropCancel(elements.pageLightbox, hideLightbox);
+    elements.zoomInBtn.addEventListener('click', () => setZoom(zoomIndex + 1));
+    elements.zoomOutBtn.addEventListener('click', () => setZoom(zoomIndex - 1));
+    elements.zoomFitBtn.addEventListener('click', () => setZoom(0));
+    elements.rotatePreviewBtn.addEventListener('click', rotatePreviewPage);
+    elements.deletePreviewBtn.addEventListener('click', deletePreviewPage);
     elements.prevPageBtn.addEventListener('click', () => changeLightboxPage(-1));
     elements.nextPageBtn.addEventListener('click', () => changeLightboxPage(1));
     elements.redactModeBtn.addEventListener('click', toggleRedactMode);
+    elements.finishRedactionBtn.addEventListener('click', () => setRedactMode(false));
     elements.clearRedactionsBtn.addEventListener('click', () => {
+        selectedRedaction = null;
         state.clearRedactions(currentPageId);
-        renderRedactionOverlay();
     });
-    elements.redactionCanvas.addEventListener('pointerdown', startRedaction);
-    elements.redactionCanvas.addEventListener('pointermove', moveRedaction);
-    elements.redactionCanvas.addEventListener('pointerup', endRedaction);
-    elements.redactionCanvas.addEventListener('pointercancel', endRedaction);
+    elements.undoLastRedactionBtn.addEventListener('click', () => {
+        const count = state.getPage(currentPageId)?.redactions.length ?? 0;
+        if (!count) return;
+        selectedRedaction = null;
+        state.removeRedaction(currentPageId, count - 1);
+    });
+    elements.redactionLayer.addEventListener('pointerdown', startRedaction);
+    elements.redactionLayer.addEventListener('pointermove', moveRedaction);
+    elements.redactionLayer.addEventListener('pointerup', endRedaction);
+    elements.redactionLayer.addEventListener('pointercancel', endRedaction);
+    elements.redactionLayer.addEventListener('click', event => {
+        const remove = event.target.closest('[data-remove-redaction]');
+        if (remove) removeRedactionAt(Number(remove.dataset.removeRedaction));
+    });
+    elements.redactionLayer.addEventListener('focusin', event => {
+        const box = event.target.closest('.redaction-box');
+        if (!box || event.target.closest('.redaction-box__remove')) return;
+        if (Number(box.dataset.index) !== selectedRedaction) selectRedaction(Number(box.dataset.index), { focus: true });
+    });
+
+    elements.lightboxFilmstrip.addEventListener('click', event => {
+        const item = event.target.closest('.filmstrip__item');
+        if (!item || item.dataset.pageId === currentPageId) return;
+        setRedactMode(false);
+        currentPageId = item.dataset.pageId;
+        elements.lightboxContent.scrollTo(0, 0);
+        renderLightboxPage();
+    });
+
+    // Swipe between pages on touch screens while the page fits the screen.
+    elements.lightboxContent.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'mouse' || isRedactMode || zoomIndex > 0) return;
+        swipe = { x: event.clientX, y: event.clientY, time: performance.now() };
+    });
+    elements.lightboxContent.addEventListener('pointerup', event => {
+        if (!swipe) return;
+        const dx = event.clientX - swipe.x;
+        const dy = event.clientY - swipe.y;
+        const quick = performance.now() - swipe.time < 600;
+        swipe = null;
+        if (quick && Math.abs(dx) > 60 && Math.abs(dy) < 60) changeLightboxPage(dx < 0 ? 1 : -1);
+    });
+    elements.lightboxContent.addEventListener('pointercancel', () => { swipe = null; });
+
     elements.pageLightbox.addEventListener('keydown', event => {
         if (dialogStack.at(-1)?.dialog !== elements.pageLightbox) return;
-        if (event.key === 'ArrowLeft') changeLightboxPage(-1);
-        if (event.key === 'ArrowRight') changeLightboxPage(1);
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+        const onBox = event.target.closest?.('.redaction-box');
+        if (onBox && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            selectRedaction(Number(onBox.dataset.index), { focus: true });
+            return;
+        }
+        // While redacting, Delete only ever removes a box (the selected or focused one), never the page.
+        const removeBoxOrPage = () => {
+            if (!isRedactMode) {
+                deletePreviewPage();
+                return;
+            }
+            const index = selectedRedaction ?? (onBox ? Number(onBox.dataset.index) : null);
+            if (index !== null) removeRedactionAt(index);
+        };
+        const shortcuts = {
+            ArrowLeft: () => changeLightboxPage(-1),
+            ArrowRight: () => changeLightboxPage(1),
+            r: rotatePreviewPage,
+            R: rotatePreviewPage,
+            Delete: removeBoxOrPage,
+            Backspace: removeBoxOrPage,
+            '+': () => setZoom(zoomIndex + 1),
+            '=': () => setZoom(zoomIndex + 1),
+            '-': () => setZoom(zoomIndex - 1),
+            '0': () => setZoom(0),
+        };
+        const run = shortcuts[event.key];
+        if (!run) return;
+        event.preventDefault();
+        run();
     });
 }

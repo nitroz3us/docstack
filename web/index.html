@@ -3,29 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#f8fafc">
-    <title>docstack — Merge and arrange PDFs</title>
-    <meta name="description" content="Merge, reorder, rotate, remove, and redact PDF pages in your browser.">
+    <meta name="theme-color" content="#f4f4f2">
+    <!-- Light theme only: stops browsers that auto-darken pages from inverting the page previews. -->
+    <meta name="color-scheme" content="light only">
+    <title>docstack · Merge and arrange PDFs, privately</title>
+    <meta name="description" content="Merge, reorder, rotate, delete and redact PDF pages right in your browser. Free, open source, and nothing is uploaded, so it works offline.">
+    <link rel="canonical" href="https://docstack.tools/">
+
+    <!-- Link previews (Open Graph: LinkedIn, Slack, iMessage, WhatsApp, Discord, Facebook) -->
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="docstack">
     <meta property="og:url" content="https://docstack.tools/">
-    <meta property="og:title" content="docstack — Merge and arrange PDFs">
-    <meta property="og:description" content="Merge and organize PDFs locally in your browser.">
-    <meta property="og:image" content="https://docstack.tools/assets/thumbnail.png">
+    <meta property="og:title" content="docstack · Merge and arrange PDFs, privately">
+    <meta property="og:description" content="Reorder, rotate, delete and redact PDF pages in your browser. Nothing ever leaves your device.">
+    <meta property="og:image" content="https://docstack.tools/assets/social-card.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="docstack: merge and arrange PDFs, privately. Pages from two files laid out side by side, one selected and one with a redaction.">
+    <meta property="og:locale" content="en_US">
+
+    <!-- X / Twitter -->
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="docstack · Merge and arrange PDFs, privately">
+    <meta name="twitter:description" content="Reorder, rotate, delete and redact PDF pages in your browser. Nothing ever leaves your device.">
+    <meta name="twitter:image" content="https://docstack.tools/assets/social-card.png">
+    <meta name="twitter:image:alt" content="docstack: merge and arrange PDFs, privately. Pages from two files laid out side by side, one selected and one with a redaction.">
+
+    <!-- Icons -->
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+
+    <!-- Search engines: describe docstack as a free web app -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "docstack",
+        "url": "https://docstack.tools/",
+        "description": "Merge, reorder, rotate, delete and redact PDF pages in your browser. Files are processed on your device and never uploaded.",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Any (runs in a web browser)",
+        "browserRequirements": "Requires a modern browser with JavaScript enabled.",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "featureList": ["Merge PDFs", "Reorder pages", "Rotate pages", "Delete pages", "Insert blank pages", "Redact content", "Works offline"],
+        "screenshot": "https://docstack.tools/assets/social-card.png",
+        "sameAs": ["https://github.com/nitroz3us/docstack"]
+    }
+    </script>
     <link rel="stylesheet" href="css/styles.css">
 </head>
-<body class="min-h-screen bg-slate-50 text-slate-950 antialiased">
+<body>
     <a href="#mainContent" class="skip-link">Skip to main content</a>
 
     <header class="app-header">
         <div class="app-header__inner">
-            <a href="./" class="brand" aria-label="docstack home">docstack</a>
-            <div class="flex items-center gap-2 sm:gap-3">
-                <span class="processing-note" title="Files are processed in this browser and are not uploaded">
-                    <span class="processing-note__status" aria-hidden="true"></span>
-                    <span>Files stay private</span>
-                </span>
+            <a href="./" class="brand" aria-label="docstack home"><span class="brand__mark" aria-hidden="true"></span><span class="brand__name">docstack</span></a>
+            <span class="app-header__divider needs-files" aria-hidden="true"></span>
+            <label class="doc-title needs-files" title="Name of the downloaded file">
+                <span class="sr-only">File name</span>
+                <input id="outputNameInput" type="text" value="merged" maxlength="120" size="7" spellcheck="false" autocomplete="off">
+                <span class="doc-title__ext" aria-hidden="true">.pdf</span>
+            </label>
+            <div class="app-header__actions">
+                <button id="offlineBadge" class="offline-badge" type="button" aria-haspopup="dialog" aria-expanded="false">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                    <span>Offline-safe</span>
+                </button>
+                <div class="history-actions needs-files">
+                    <button id="undoBtn" class="icon-button" type="button" aria-label="Undo" aria-keyshortcuts="Control+Z Meta+Z" title="Undo (Ctrl/⌘ Z)" disabled>
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5"/><path d="M5 12h8a6 6 0 016 6"/></svg>
+                    </button>
+                    <button id="redoBtn" class="icon-button" type="button" aria-label="Redo" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z" title="Redo (Ctrl/⌘ Shift Z)" disabled>
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 7l5 5-5 5"/><path d="M19 12h-8a6 6 0 00-6 6"/></svg>
+                    </button>
+                </div>
+                <button id="addFilesBtn" class="button button--secondary add-files-button needs-files" type="button" aria-label="Add PDFs">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                    <span class="add-files-button__label">Add PDFs</span>
+                </button>
+                <div class="split-button needs-files desktop-only">
+                    <button id="exportBtn" class="button button--primary split-button__main" type="button">Download</button>
+                    <button id="exportMenuBtn" class="button button--primary split-button__menu" type="button" aria-label="More download options" aria-haspopup="menu" aria-expanded="false">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                </div>
                 <a class="icon-button github-link" href="https://github.com/nitroz3us/docstack" target="_blank" rel="noopener noreferrer" aria-label="View docstack on GitHub" title="View source on GitHub">
                     <svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
                 </a>
@@ -34,174 +97,193 @@
     </header>
 
     <main id="mainContent">
-        <section id="landingView" class="landing-shell" aria-labelledby="landingTitle">
-            <div class="landing-copy">
-                <h1 id="landingTitle">Merge PDFs. Keep your files private.</h1>
-                <p>Choose PDFs to arrange, rotate, remove, or redact. Processing happens in your browser, and your files are never sent to a server.</p>
-            </div>
-
-            <div id="dropZone" class="drop-zone" data-state="idle">
-                <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden>
-                <div class="drop-zone__icon" aria-hidden="true">
-                    <svg viewBox="0 0 32 32">
-                        <path fill="#909090" d="m24.1 2.072 5.564 5.8v22.056H8.879V30h20.856V7.945z"/>
-                        <path fill="#f4f4f4" d="M24.031 2H8.808v27.928h20.856V7.873z"/>
-                        <path fill="#7a7b7c" d="M8.655 3.5h-6.39v6.827h20.1V3.5z"/>
-                        <path fill="#dd2025" d="M22.472 10.211H2.395V3.379h20.077z"/>
-                        <path fill="#464648" d="M9.052 4.534H7.745v4.8h1.028V7.715L9 7.728a2 2 0 0 0 .647-.117 1.4 1.4 0 0 0 .493-.291 1.2 1.2 0 0 0 .335-.454 2.1 2.1 0 0 0 .105-.908 2.2 2.2 0 0 0-.114-.644 1.17 1.17 0 0 0-.687-.65 2 2 0 0 0-.409-.104 2 2 0 0 0-.319-.026m-.189 2.294h-.089v-1.48h.193a.57.57 0 0 1 .459.181.92.92 0 0 1 .183.558c0 .246 0 .469-.222.626a.94.94 0 0 1-.524.114m3.671-2.306c-.111 0-.219.008-.295.011L12 4.538h-.78v4.8h.918a2.7 2.7 0 0 0 1.028-.175 1.7 1.7 0 0 0 .68-.491 1.9 1.9 0 0 0 .373-.749 3.7 3.7 0 0 0 .114-.949 4.4 4.4 0 0 0-.087-1.127 1.8 1.8 0 0 0-.4-.733 1.6 1.6 0 0 0-.535-.4 2.4 2.4 0 0 0-.549-.178 1.3 1.3 0 0 0-.228-.017m-.182 3.937h-.1V5.392h.013a1.06 1.06 0 0 1 .6.107 1.2 1.2 0 0 1 .324.4 1.3 1.3 0 0 1 .142.526c.009.22 0 .4 0 .549a3 3 0 0 1-.033.513 1.8 1.8 0 0 1-.169.5 1.1 1.1 0 0 1-.363.36.67.67 0 0 1-.416.106m5.08-3.915H15v4.8h1.028V7.434h1.3v-.892h-1.3V5.43h1.4v-.892"/>
-                        <path fill="#dd2025" d="M21.781 20.255s3.188-.578 3.188.511-1.975.646-3.188-.511m-2.357.083a7.5 7.5 0 0 0-1.473.489l.4-.9c.4-.9.815-2.127.815-2.127a14 14 0 0 0 1.658 2.252 13 13 0 0 0-1.4.288Zm-1.262-6.5c0-.949.307-1.208.546-1.208s.508.115.517.939a10.8 10.8 0 0 1-.517 2.434 4.4 4.4 0 0 1-.547-2.162Zm-4.649 10.516c-.978-.585 2.051-2.386 2.6-2.444-.003.001-1.576 3.056-2.6 2.444M25.9 20.895c-.01-.1-.1-1.207-2.07-1.16a14 14 0 0 0-2.453.173 12.5 12.5 0 0 1-2.012-2.655 11.8 11.8 0 0 0 .623-3.1c-.029-1.2-.316-1.888-1.236-1.878s-1.054.815-.933 2.013a9.3 9.3 0 0 0 .665 2.338s-.425 1.323-.987 2.639-.946 2.006-.946 2.006a9.6 9.6 0 0 0-2.725 1.4c-.824.767-1.159 1.356-.725 1.945.374.508 1.683.623 2.853-.91a23 23 0 0 0 1.7-2.492s1.784-.489 2.339-.623 1.226-.24 1.226-.24 1.629 1.639 3.2 1.581 1.495-.939 1.485-1.035"/>
-                        <path fill="#909090" d="M23.954 2.077V7.95h5.633z"/>
-                        <path fill="#f4f4f4" d="M24.031 2v5.873h5.633z"/>
-                        <path fill="#fff" d="M8.975 4.457H7.668v4.8H8.7V7.639l.228.013a2 2 0 0 0 .647-.117 1.4 1.4 0 0 0 .493-.291 1.2 1.2 0 0 0 .332-.454 2.1 2.1 0 0 0 .105-.908 2.2 2.2 0 0 0-.114-.644 1.17 1.17 0 0 0-.687-.65 2 2 0 0 0-.411-.105 2 2 0 0 0-.319-.026m-.189 2.294h-.089v-1.48h.194a.57.57 0 0 1 .459.181.92.92 0 0 1 .183.558c0 .246 0 .469-.222.626a.94.94 0 0 1-.524.114m3.67-2.306c-.111 0-.219.008-.295.011l-.235.006h-.78v4.8h.918a2.7 2.7 0 0 0 1.028-.175 1.7 1.7 0 0 0 .68-.491 1.9 1.9 0 0 0 .373-.749 3.7 3.7 0 0 0 .114-.949 4.4 4.4 0 0 0-.087-1.127 1.8 1.8 0 0 0-.4-.733 1.6 1.6 0 0 0-.535-.4 2.4 2.4 0 0 0-.549-.178 1.3 1.3 0 0 0-.228-.017m-.182 3.937h-.1V5.315h.013a1.06 1.06 0 0 1 .6.107 1.2 1.2 0 0 1 .324.4 1.3 1.3 0 0 1 .142.526c.009.22 0 .4 0 .549a3 3 0 0 1-.033.513 1.8 1.8 0 0 1-.169.5 1.1 1.1 0 0 1-.363.36.67.67 0 0 1-.416.106m5.077-3.915h-2.43v4.8h1.028V7.357h1.3v-.892h-1.3V5.353h1.4v-.892"/>
-                    </svg>
-                </div>
-                <h2>Add your PDF files</h2>
-                <p>Drop them here, or choose files from your device.</p>
-                <button id="browseBtn" class="button button--primary" type="button">Choose PDFs</button>
-                <p class="drop-zone__hint">PDF files only · Files stay on your device</p>
-            </div>
-
-            <div class="landing-features" aria-label="How docstack works">
-                <div><span>1</span><strong>Add</strong><p>Choose one or more PDFs.</p></div>
-                <div><span>2</span><strong>Organize</strong><p>Arrange and edit pages visually.</p></div>
-                <div><span>3</span><strong>Download</strong><p>Save one finished PDF.</p></div>
-            </div>
-        </section>
-
-        <section id="workspace" class="workspace hidden" aria-labelledby="workspaceTitle">
-            <div class="workspace-topbar">
-                <div>
-                    <h1 id="workspaceTitle">Arrange your PDF</h1>
-                </div>
-                <div class="workspace-topbar__actions">
-                    <button id="addFilesBtn" class="button button--secondary add-files-button" type="button">
-                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-                        Add PDFs
-                    </button>
-                </div>
-            </div>
-
-            <div id="renderProgress" class="progress-panel hidden" role="progressbar" aria-label="Preparing page previews" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-                <div class="progress-panel__label">
-                    <span id="renderProgressText">Preparing previews</span>
-                    <span id="renderProgressPercent">0%</span>
-                </div>
+        <section id="workspace" class="workspace" aria-labelledby="workspaceTitle">
+            <h1 id="workspaceTitle" class="sr-only needs-files">Arrange and merge PDF pages</h1>
+            <div id="renderProgress" class="progress-panel hidden" role="progressbar" aria-label="Opening documents" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                 <div class="progress-track"><div id="renderProgressBar" class="progress-bar"></div></div>
+                <span id="renderProgressText" class="progress-panel__label" aria-live="polite">Opening documents</span>
             </div>
 
-            <div class="mobile-view-toggle" aria-label="Workspace view">
-                <button id="showDocumentsBtn" type="button" aria-pressed="false">Documents</button>
-                <button id="showPagesBtn" type="button" aria-pressed="true">Pages</button>
-            </div>
+            <section id="pagesPanel" class="pages-panel" aria-labelledby="pagesTitle">
+                <div id="dropZone" class="drop-zone" data-state="idle">
+                    <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden>
+                    <div class="drop-zone__pages" aria-hidden="true"><span></span><span></span><span></span></div>
+                    <h1 id="landingTitle">Merge and arrange PDFs, privately.</h1>
+                    <p class="drop-zone__lede">Nothing is uploaded. Every page is handled on this device, so docstack keeps working with Wi‑Fi turned off.</p>
+                    <button id="browseBtn" class="button button--primary drop-zone__button" type="button">Choose PDFs</button>
+                    <p class="drop-zone__hint">or drop PDF files anywhere on this page</p>
+                    <p class="drop-zone__verbs">Reorder · Rotate · Delete · Redact · Merge</p>
+                </div>
 
-            <div class="workspace-grid">
-                <aside id="documentsPanel" class="documents-panel" aria-labelledby="documentsTitle">
-                    <div class="panel-heading">
-                        <div>
-                            <h2 id="documentsTitle">Documents</h2>
-                            <p id="documentCount">0 files</p>
-                        </div>
+                <div class="pages-toolbar needs-files">
+                    <div class="pages-toolbar__summary">
+                        <h2 id="pagesTitle" class="sr-only">Pages</h2>
+                        <p><span id="pageCount">0 pages</span><span class="touch-hint">Long-press to select</span></p>
                     </div>
-                    <div id="documentList" class="document-list"></div>
-                </aside>
-
-                <section id="pagesPanel" class="pages-panel" aria-labelledby="pagesTitle">
-                    <div class="pages-toolbar">
-                        <div>
-                            <h2 id="pagesTitle">Pages</h2>
-                            <p id="pageCount">0 pages</p>
-                        </div>
-                        <div class="pages-toolbar__actions">
-                            <button id="selectAllBtn" class="button button--quiet" type="button">Select all</button>
-                            <label class="density-control">
-                                <span class="sr-only">Thumbnail size</span>
-                                <select id="densitySelect">
-                                    <option value="comfortable">Comfortable</option>
-                                    <option value="compact">Compact</option>
-                                </select>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div id="selectionToolbar" class="selection-toolbar hidden" aria-live="polite">
-                        <strong id="selectionCount">0 selected</strong>
-                        <div class="selection-toolbar__actions">
-                            <button id="rotateSelectedBtn" class="selection-action" type="button">
-                                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
-                                Rotate 90°
+                    <div class="pages-toolbar__actions">
+                        <button id="selectAllBtn" class="button button--quiet" type="button">Select all</button>
+                        <div id="sizeControl" class="size-control" role="radiogroup" aria-label="Page size">
+                            <button type="button" role="radio" data-density="compact" aria-checked="false" aria-label="Small pages" title="Small pages">
+                                <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg>
                             </button>
-                            <button id="deleteSelectedBtn" class="selection-action selection-action--danger" type="button">
-                                <svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zM17 6H7v13h10zM9 17h2V8H9zm4 0h2V8h-2zM7 6v13z"/></svg>
-                                Delete
+                            <button type="button" role="radio" data-density="comfortable" aria-checked="true" aria-label="Medium pages" title="Medium pages">
+                                <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="7" height="14" rx="1"/><rect x="13" y="5" width="7" height="14" rx="1"/></svg>
                             </button>
-                            <button id="clearSelectionBtn" class="icon-button selection-clear" type="button" aria-label="Clear page selection">
-                                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                            <button type="button" role="radio" data-density="large" aria-checked="false" aria-label="Large pages" title="Large pages">
+                                <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="6" y="3.5" width="12" height="17" rx="1.2"/></svg>
                             </button>
                         </div>
                     </div>
+                </div>
 
-                    <div id="pagesEmptyState" class="pages-empty hidden">
-                        <h3>No pages in this composition</h3>
-                        <p>Add another PDF or undo your last deletion.</p>
-                        <button id="emptyAddFilesBtn" class="button button--secondary" type="button">Add PDFs</button>
-                    </div>
-                    <div id="pageGrid" class="page-grid" aria-label="Pages in download order"></div>
-                </section>
-            </div>
+                <div id="pagesEmptyState" class="pages-empty hidden">
+                    <h3>No pages in this composition</h3>
+                    <p>Add another PDF or undo your last deletion.</p>
+                    <button id="emptyAddFilesBtn" class="button button--secondary" type="button">Add PDFs</button>
+                </div>
+                <div id="pageGrid" class="page-grid" role="listbox" aria-multiselectable="true" aria-label="Pages in download order" aria-describedby="pageGridHelp"></div>
+                <p id="pageGridHelp" class="sr-only">Arrow keys move between pages. Shift with an arrow key extends the selection. Space or Enter opens a page. Alt with an arrow key moves the selected pages.</p>
+            </section>
         </section>
     </main>
 
     <div id="exportBar" class="export-bar hidden">
         <div class="export-bar__inner">
-            <div class="history-actions">
-                <button id="undoBtn" class="icon-button" type="button" aria-label="Undo" disabled>
-                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5"/><path d="M5 12h8a6 6 0 016 6"/></svg>
-                </button>
-                <button id="redoBtn" class="icon-button" type="button" aria-label="Redo" disabled>
-                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 7l5 5-5 5"/><path d="M19 12h-8a6 6 0 00-6 6"/></svg>
+            <button id="mobileUndoBtn" class="icon-button" type="button" aria-label="Undo" disabled>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5"/><path d="M5 12h8a6 6 0 016 6"/></svg>
+            </button>
+            <span id="exportPageCount" class="export-bar__count">0 pages</span>
+            <div class="split-button">
+                <button id="mobileExportBtn" class="button button--primary split-button__main" type="button">Download</button>
+                <button id="mobileExportMenuBtn" class="button button--primary split-button__menu" type="button" aria-label="More download options" aria-haspopup="menu" aria-expanded="false">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
                 </button>
             </div>
-            <label class="output-name-control">
-                <span>Filename</span>
-                <span class="output-name-input"><input id="outputNameInput" type="text" value="merged" maxlength="120" autocomplete="off"><span>.pdf</span></span>
-            </label>
-            <div class="export-summary"><strong id="exportPageCount">0 pages</strong><span>Ready to download</span></div>
-            <button id="exportBtn" class="button button--primary" type="button">Download PDF</button>
         </div>
     </div>
 
-    <div id="pageLightbox" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle">
+    <div id="selectionToolbar" class="selection-bar hidden" role="toolbar" aria-label="Selected pages">
+        <strong id="selectionCount" class="selection-bar__count" aria-live="polite">0 selected</strong>
+        <span class="selection-bar__divider" aria-hidden="true"></span>
+        <button id="openSelectedBtn" class="selection-bar__button" type="button" aria-keyshortcuts="Space" title="Open (Space)">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+            <span>Open</span>
+        </button>
+        <button id="rotateSelectedBtn" class="selection-bar__button" type="button" aria-keyshortcuts="R" title="Rotate (R)">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+            <span>Rotate</span>
+        </button>
+        <button id="moveSelectedEarlierBtn" class="selection-bar__button selection-bar__button--icon" type="button" aria-label="Move earlier" aria-keyshortcuts="Alt+ArrowLeft" title="Move earlier (Alt ←)">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+        </button>
+        <button id="moveSelectedLaterBtn" class="selection-bar__button selection-bar__button--icon" type="button" aria-label="Move later" aria-keyshortcuts="Alt+ArrowRight" title="Move later (Alt →)">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <button id="insertSelectedBtn" class="selection-bar__button" type="button" aria-haspopup="menu" aria-expanded="false" title="Insert a PDF or blank page after the selection">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            <span>Insert</span>
+        </button>
+        <button id="extractSelectedBtn" class="selection-bar__button" type="button" title="Download only the selected pages">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>
+            <span>Extract</span>
+        </button>
+        <button id="deleteSelectedBtn" class="selection-bar__button selection-bar__button--danger" type="button" aria-keyshortcuts="Delete" title="Delete (Delete)">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zM17 6H7v13h10zM9 17h2V8H9zm4 0h2V8h-2zM7 6v13z"/></svg>
+            <span>Delete</span>
+        </button>
+        <span class="selection-bar__divider" aria-hidden="true"></span>
+        <button id="clearSelectionBtn" class="selection-bar__button selection-bar__button--icon" type="button" aria-label="Clear selection" aria-keyshortcuts="Escape" title="Clear selection (Esc)">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+    </div>
+    <div id="dropIndicator" class="drop-indicator hidden" aria-hidden="true"></div>
+    <div id="dropIndicatorLabel" class="drop-indicator__label hidden" aria-hidden="true"></div>
+    <div id="selectionMarquee" class="selection-marquee hidden" aria-hidden="true"></div>
+
+    <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+
+    <div id="dropOverlay" class="drop-overlay hidden" aria-hidden="true">
+        <div class="drop-overlay__panel">
+            <svg viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7 9l5-5 5 5"/><path d="M5 15v3a2 2 0 002 2h10a2 2 0 002-2v-3"/></svg>
+            <strong>Drop PDFs to add them</strong>
+            <span id="dropOverlayHint">PDF files only</span>
+        </div>
+    </div>
+
+    <div id="pageLightbox" class="dialog-backdrop viewer hidden" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle">
         <div class="preview-dialog">
             <div class="preview-toolbar">
-                <div>
+                <button id="closeLightbox" class="button button--secondary viewer-back" type="button" aria-label="Back to pages" title="Back to pages (Esc)">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+                    <span>Pages</span>
+                </button>
+                <div class="viewer-title">
                     <h2 id="lightboxTitle">Page preview</h2>
                     <p id="lightboxPosition"></p>
                 </div>
                 <div class="preview-toolbar__actions">
-                    <button id="redactModeBtn" class="button button--danger-quiet" type="button" aria-label="Enter redaction mode" aria-pressed="false">Redact</button>
-                    <button id="clearRedactionsBtn" class="button button--quiet hidden" type="button" aria-label="Clear all redactions">Clear</button>
-                    <button id="closeLightbox" class="icon-button icon-button--inverse" type="button" aria-label="Close page preview">
-                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                    <div class="zoom-control" role="group" aria-label="Zoom">
+                        <button id="zoomOutBtn" class="zoom-control__button" type="button" aria-label="Zoom out" aria-keyshortcuts="-" title="Zoom out (−)">
+                            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
+                        </button>
+                        <button id="zoomFitBtn" class="zoom-control__value" type="button" aria-label="Fit page to window" aria-keyshortcuts="0" title="Fit to window (0)">Fit</button>
+                        <button id="zoomInBtn" class="zoom-control__button" type="button" aria-label="Zoom in" aria-keyshortcuts="+" title="Zoom in (+)">
+                            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>
+                        </button>
+                    </div>
+                    <span class="preview-toolbar__divider" aria-hidden="true"></span>
+                    <button id="rotatePreviewBtn" class="preview-action" type="button" aria-label="Rotate page" aria-keyshortcuts="R" title="Rotate (R)">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+                        <span>Rotate</span>
+                    </button>
+                    <button id="deletePreviewBtn" class="preview-action preview-action--danger" type="button" aria-label="Delete page" aria-keyshortcuts="Delete" title="Delete page (Delete)">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zM17 6H7v13h10zM9 17h2V8H9zm4 0h2V8h-2zM7 6v13z"/></svg>
+                        <span>Delete</span>
+                    </button>
+                    <button id="redactModeBtn" class="preview-action preview-action--redact" type="button" aria-pressed="false" title="Cover content so it is removed from the download">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16M4 19h9"/><rect x="4" y="9.5" width="16" height="5" rx="1" fill="currentColor" stroke="none"/></svg>
+                        <span>Redact</span>
                     </button>
                 </div>
             </div>
-            <div id="lightboxContent" class="preview-canvas-wrap">
-                <canvas id="lightboxCanvas"></canvas>
-                <canvas id="redactionCanvas" class="redaction-canvas" aria-label="Redaction drawing layer"></canvas>
+
+            <div id="redactionBanner" class="redaction-banner hidden" role="region" aria-label="Redaction mode">
+                <span class="redaction-banner__dot" aria-hidden="true"></span>
+                <strong>Redacting</strong>
+                <span class="redaction-banner__text">Drag across the page to cover text or images. Click a box to select it; press Delete to remove it.</span>
+                <span id="redactionCount" class="redaction-banner__count" aria-live="polite">No boxes yet</span>
+                <div class="redaction-banner__actions">
+                    <button id="undoLastRedactionBtn" class="button button--secondary" type="button">Undo last box</button>
+                    <button id="clearRedactionsBtn" class="button button--quiet" type="button">Clear all</button>
+                    <button id="finishRedactionBtn" class="button button--primary" type="button">Done</button>
+                </div>
             </div>
-            <button id="prevPageBtn" class="preview-nav preview-nav--previous" type="button" aria-label="Previous page">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
-            </button>
-            <button id="nextPageBtn" class="preview-nav preview-nav--next" type="button" aria-label="Next page">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
-            </button>
+
+            <div class="viewer-body">
+                <nav id="lightboxFilmstrip" class="filmstrip" aria-label="Pages"></nav>
+                <div class="viewer-stage">
+                    <div id="lightboxContent" class="preview-canvas-wrap">
+                        <span id="lightboxSpinner" class="preview-spinner hidden" aria-hidden="true"></span>
+                        <div id="lightboxPage" class="viewer-page">
+                            <canvas id="lightboxCanvas"></canvas>
+                            <div id="redactionLayer" class="redaction-layer" aria-label="Redactions on this page"></div>
+                        </div>
+                    </div>
+                    <button id="prevPageBtn" class="preview-nav preview-nav--previous" type="button" aria-label="Previous page" title="Previous page (←)">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+                    </button>
+                    <button id="nextPageBtn" class="preview-nav preview-nav--next" type="button" aria-label="Next page" title="Next page (→)">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="passwordModal" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="passwordTitle">
         <div class="dialog-card dialog-card--small">
             <div class="dialog-heading">
-                <div><p class="eyebrow">Protected PDF</p><h2 id="passwordTitle">Enter document password</h2></div>
+                <div><h2 id="passwordTitle">Enter document password</h2></div>
                 <button id="closePasswordModal" class="icon-button" type="button" aria-label="Skip protected document"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
             </div>
             <p id="passwordModalFileName" class="dialog-description"></p>
@@ -217,7 +299,7 @@
 
     <div id="encryptionWarningModal" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="encryptionWarningTitle">
         <div class="dialog-card">
-            <div class="dialog-heading"><div><p class="eyebrow eyebrow--warning">Export notice</p><h2 id="encryptionWarningTitle">Some pages need rasterizing</h2></div></div>
+            <div class="dialog-heading"><div><h2 id="encryptionWarningTitle">Some pages need rasterizing</h2></div></div>
             <p class="dialog-description">Protected documents will be embedded as high-quality images. Text on those pages will not be searchable or selectable.</p>
             <ul id="warningFileList" class="warning-file-list"></ul>
             <div class="dialog-actions">
@@ -229,7 +311,7 @@
 
     <div id="redactionWarningModal" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="redactionWarningTitle">
         <div class="dialog-card">
-            <div class="dialog-heading"><div><p class="eyebrow eyebrow--danger">Permanent edit</p><h2 id="redactionWarningTitle">Redaction rasterizes this page</h2></div></div>
+            <div class="dialog-heading"><div><h2 id="redactionWarningTitle">Redaction rasterizes this page</h2></div></div>
             <p class="dialog-description">Draw over content you want removed. The downloaded page becomes an image so covered content cannot be selected or extracted.</p>
             <div class="dialog-actions">
                 <button id="cancelRedactionBtn" class="button button--secondary" type="button">Cancel</button>

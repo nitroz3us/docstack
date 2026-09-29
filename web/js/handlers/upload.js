@@ -7,7 +7,13 @@ function looksLikePdf(file) {
     return file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
 }
 
-export async function handleFiles(fileList, callbacks = {}) {
+/**
+ * @param {FileList|File[]} fileList
+ * @param {Object} [callbacks]
+ * @param {{insertAt?: number}} [options] - insert the files at this page position, in order,
+ *   instead of adding them after the current pages.
+ */
+export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
     const candidates = Array.from(fileList);
     const files = candidates.filter(looksLikePdf);
     const ignored = candidates.length - files.length;
@@ -19,6 +25,7 @@ export async function handleFiles(fileList, callbacks = {}) {
 
     callbacks.onBusy?.(true);
     let added = 0;
+    let position = insertAt;
 
     try {
         for (let index = 0; index < files.length; index++) {
@@ -48,15 +55,17 @@ export async function handleFiles(fileList, callbacks = {}) {
                 }
                 if (!pdfProxy) continue;
 
+                const pageCount = getPageCount(pdfProxy);
                 state.addFile({
                     id: generateId(),
                     name: file.name,
                     size: file.size,
                     arrayBuffer,
                     pdfProxy,
-                    pageCount: getPageCount(pdfProxy),
+                    pageCount,
                     password,
-                });
+                }, { insertAt: position });
+                if (position !== undefined) position += pageCount;
                 added++;
                 callbacks.onFileAdded?.(file.name);
             } catch (error) {

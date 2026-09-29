@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<!--
+  Source for web/assets/social-card.png (1200×630, the link preview on social sites and chat apps).
+  Regenerate on macOS with:
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
+      --force-device-scale-factor=1 --window-size=1200,630 \
+      --screenshot=web/assets/social-card.png design/social-card.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>docstack social card</title>
+<style>
+    :root {
+        --desk: #f4f4f2;
+        --ink: #18181b;
+        --muted: #6b6b70;
+        --subtle: #7a7a80;
+        --accent: #2b5bd7;
+        --paper-shadow: 0 1px 2px rgba(24, 24, 27, .08), 0 4px 14px rgba(24, 24, 27, .08);
+        --ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+    body { position: relative; background: var(--desk); color: var(--ink); font-family: var(--ui); -webkit-font-smoothing: antialiased; }
+
+    .copy { position: absolute; left: 76px; top: 70px; bottom: 64px; width: 520px; display: flex; flex-direction: column; }
+    .brand { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 600; letter-spacing: -.02em; }
+    .mark { position: relative; width: 26px; height: 32px; }
+    .mark::before, .mark::after { content: ""; position: absolute; width: 19px; height: 25px; border: 2.6px solid var(--ink); border-radius: 3px; background: var(--desk); }
+    .mark::before { left: 0; top: 0; }
+    .mark::after { left: 7px; top: 7px; background: var(--ink); }
+    h1 { margin: 64px 0 0; font-size: 62px; line-height: 1.04; font-weight: 600; letter-spacing: -.035em; }
+    .lede { margin: 26px 0 0; max-width: 470px; color: var(--muted); font-size: 25px; line-height: 1.45; letter-spacing: -.005em; }
+    .foot { margin-top: auto; display: flex; align-items: center; gap: 18px; color: var(--subtle); font-size: 20px; }
+    .foot .url { color: var(--ink); font-family: var(--mono); font-size: 19px; }
+    .foot .lock { display: inline-flex; align-items: center; gap: 8px; }
+    .foot svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* A slice of the app: file groups with pages on the desk. It runs off the right and bottom edges. */
+    .desk { position: absolute; left: 664px; top: 72px; display: flex; flex-direction: column; gap: 36px; }
+    .run { display: flex; flex-direction: column; gap: 14px; }
+    .label { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 16px; }
+    .label b { color: var(--ink); font-weight: 500; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; }
+    .pages { display: flex; gap: 26px; }
+    .tile { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .page { position: relative; width: 150px; height: 194px; padding: 18px 16px; display: flex; flex-direction: column; gap: 7px; border-radius: 2px; background: #fff; box-shadow: var(--paper-shadow); }
+    .page.selected { box-shadow: 0 0 0 3px var(--accent), var(--paper-shadow); }
+    .check { position: absolute; top: -11px; right: -11px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); }
+    .check svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .num { color: var(--subtle); font: 500 15px var(--mono); }
+    .num.on { color: var(--accent); }
+    .h { height: 9px; width: 64%; border-radius: 3px; background: #3b3b40; }
+    .l { height: 5px; border-radius: 3px; background: #dcdcdf; }
+    .band { margin: -18px -16px 8px; height: 58px; background: #17304f; border-bottom: 4px solid #d9a441; }
+    .chart { height: 58px; margin: 4px 0 6px; display: flex; align-items: flex-end; gap: 6px; border-bottom: 1.5px solid #a3a3a8; }
+    .chart span { flex: 1; border-radius: 2px 2px 0 0; background: #4a6fa5; }
+    .chart span:nth-child(3) { background: #d9a441; }
+    .redact { height: 16px; margin: 3px 0; background: #0b0b0c; }
+</style>
+</head>
+<body>
+    <section class="copy">
+        <div class="brand"><span class="mark" aria-hidden="true"></span>docstack</div>
+        <h1>Merge and arrange PDFs, privately.</h1>
+        <p class="lede">Reorder, rotate, delete and redact pages. Nothing ever leaves your device.</p>
+        <div class="foot">
+            <span class="url">docstack.tools</span>
+            <span class="lock"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Works offline · Free · Open source</span>
+        </div>
+    </section>
+
+    <section class="desk" aria-hidden="true">
+        <div class="run">
+            <div class="label"><span class="dot" style="background:#6e8bd9"></span><b>Q3-board-report.pdf</b>pages 1–3</div>
+            <div class="pages">
+                <div class="tile"><div class="page"><div class="band"></div><div class="h"></div><div class="l" style="width:80%"></div><div class="l" style="width:55%"></div></div><span class="num">1</span></div>
+                <div class="tile"><div class="page selected"><span class="check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><div class="h"></div><div class="chart"><span style="height:60%"></span><span style="height:85%"></span><span style="height:95%"></span><span style="height:50%"></span></div><div class="l" style="width:92%"></div><div class="l" style="width:78%"></div><div class="l" style="width:88%"></div></div><span class="num on">2</span></div>
+                <div class="tile"><div class="page"><div class="h" style="width:52%"></div><div class="l" style="width:94%"></div><div class="redact"></div><div class="l" style="width:86%"></div><div class="l" style="width:90%"></div><div class="l" style="width:70%"></div><div class="l" style="width:84%"></div></div><span class="num">3</span></div>
+            </div>
+        </div>
+        <div class="run">
+            <div class="label"><span class="dot" style="background:#d2a15c"></span><b>Invoice-2291.pdf</b>pages 1–3</div>
+            <div class="pages">
+                <div class="tile"><div class="page"><div class="h" style="width:44%"></div><div class="l" style="width:60%"></div><div class="l" style="width:92%;margin-top:14px"></div><div class="l" style="width:92%"></div><div class="l" style="width:92%"></div></div><span class="num">4</span></div>
+                <div class="tile"><div class="page"><div class="h" style="width:70%"></div><div class="l" style="width:88%"></div><div class="l" style="width:94%"></div><div class="l" style="width:76%"></div></div><span class="num">5</span></div>
+                <div class="tile"><div class="page"></div><span class="num">6</span></div>
+            </div>
+        </div>
+    </section>
+</body>
+</html>

@@ -14,6 +14,7 @@ const listeners = new Set();
 const undoStack = [];
 const redoStack = [];
 const HISTORY_LIMIT = 50;
+export const FILE_COLOR_COUNT = 6;
 
 function createId() {
     return crypto.randomUUID();
@@ -28,6 +29,26 @@ function clonePage(page) {
         ...page,
         redactions: (page.redactions || []).map(cloneRedaction),
     };
+}
+
+/** Rotate a normalized rect a quarter turn clockwise within its page. */
+function rotateRedactionClockwise(rect) {
+    return { x: 1 - rect.y - rect.height, y: rect.x, width: rect.height, height: rect.width };
+}
+
+function rotateRedactions(redactions, delta) {
+    const quarterTurns = (((delta / 90) % 4) + 4) % 4;
+    let next = redactions;
+    for (let turn = 0; turn < quarterTurns; turn++) next = next.map(rotateRedactionClockwise);
+    return next;
+}
+
+function nextColorIndex() {
+    const used = new Set(uploadedFiles.filter(file => !file.isBlank).map(file => file.colorIndex));
+    for (let index = 0; index < FILE_COLOR_COUNT; index++) {
+        if (!used.has(index)) return index;
+    }
+    return uploadedFiles.length % FILE_COLOR_COUNT;
 }
 
 function snapshot() {
@@ -90,20 +111,50 @@ export function resetState() {
     emit({ type: 'reset' });
 }
 
-export function addFile(fileData) {
-    const pages = Array.from({ length: fileData.pageCount }, (_, sourcePageIndex) => ({
+function createPages(fileId, sourcePageIndexes) {
+    return sourcePageIndexes.map(sourcePageIndex => ({
         id: createId(),
-        sourceFileId: fileData.id,
+        sourceFileId: fileId,
         sourcePageIndex,
         rotation: 0,
         redactions: [],
     }));
+}
 
-    commit(`Added ${fileData.name}`, () => {
+function clampPosition(position) {
+    if (position === undefined || position === null) return compositionPages.length;
+    return Math.max(0, Math.min(compositionPages.length, position));
+}
+
+/**
+ * @param {Object} fileData
+ * @param {{insertAt?: number, label?: string}} [options] - insert the file's pages at a position
+ *   in the document instead of appending them.
+ */
+export function addFile(fileData, { insertAt, label } = {}) {
+    // Blank-page sources are neutral and don't use up one of the file colours.
+    fileData = { ...fileData, colorIndex: fileData.isBlank ? null : nextColorIndex() };
+    const pages = createPages(fileData.id, Array.from({ length: fileData.pageCount }, (_, index) => index));
+    const position = clampPosition(insertAt);
+
+    commit(label || `Added ${fileData.name}`, () => {
         uploadedFiles = [...uploadedFiles, fileData];
-        compositionPages = [...compositionPages, ...pages];
+        compositionPages = [...compositionPages.slice(0, position), ...pages, ...compositionPages.slice(position)];
     });
 
+    return pages;
+}
+
+/** Add more pages from an already-open file (e.g. another blank page) at a position. */
+export function insertSourcePages(fileId, sourcePageIndexes, insertAt, label) {
+    const file = getFile(fileId);
+    if (!file || sourcePageIndexes.some(index => index < 0 || index >= file.pageCount)) return [];
+    const pages = createPages(fileId, sourcePageIndexes);
+    const position = clampPosition(insertAt);
+
+    commit(label || `Inserted ${pages.length} page${pages.length === 1 ? '' : 's'}`, () => {
+        compositionPages = [...compositionPages.slice(0, position), ...pages, ...compositionPages.slice(position)];
+    });
     return pages;
 }
 
@@ -130,28 +181,6 @@ export function removeFile(fileId) {
     return true;
 }
 
-/**
- * Move every page from a source document as one block. This is the explicit
- * whole-document alternative to dragging individual pages.
- */
-export function moveFile(fileId, delta) {
-    const fromIndex = uploadedFiles.findIndex(file => file.id === fileId);
-    const toIndex = Math.max(0, Math.min(uploadedFiles.length - 1, fromIndex + delta));
-    if (fromIndex < 0 || fromIndex === toIndex) return false;
-
-    commit('Moved document', () => {
-        const nextFiles = [...uploadedFiles];
-        const [movedFile] = nextFiles.splice(fromIndex, 1);
-        nextFiles.splice(toIndex, 0, movedFile);
-        uploadedFiles = nextFiles;
-
-        const pagesByFile = new Map(nextFiles.map(file => [file.id, []]));
-        compositionPages.forEach(page => pagesByFile.get(page.sourceFileId)?.push(page));
-        compositionPages = nextFiles.flatMap(file => pagesByFile.get(file.id) || []);
-    });
-    return true;
-}
-
 export function deletePage(pageId) {
     const page = getPage(pageId);
     if (!page) return false;
@@ -161,10 +190,10 @@ export function deletePage(pageId) {
     return true;
 }
 
-export function deletePages(pageIds) {
+export function deletePages(pageIds, label) {
     const ids = new Set(pageIds);
     if (!compositionPages.some(page => ids.has(page.id))) return false;
-    commit(`Deleted ${ids.size} page${ids.size === 1 ? '' : 's'}`, () => {
+    commit(label || `Deleted ${ids.size} page${ids.size === 1 ? '' : 's'}`, () => {
         compositionPages = compositionPages.filter(page => !ids.has(page.id));
     });
     return true;
@@ -175,7 +204,11 @@ export function rotatePages(pageIds, delta = 90) {
     if (!compositionPages.some(page => ids.has(page.id))) return false;
     commit(`Rotated ${ids.size} page${ids.size === 1 ? '' : 's'}`, () => {
         compositionPages = compositionPages.map(page => ids.has(page.id)
-            ? { ...page, rotation: (page.rotation + delta + 360) % 360 }
+            ? {
+                ...page,
+                rotation: (page.rotation + delta + 360) % 360,
+                redactions: rotateRedactions(page.redactions, delta),
+            }
             : page
         );
     });
@@ -191,6 +224,49 @@ export function movePage(pageId, delta) {
         const next = [...compositionPages];
         const [page] = next.splice(fromIndex, 1);
         next.splice(toIndex, 0, page);
+        compositionPages = next;
+    });
+    return true;
+}
+
+/**
+ * Nudge a (possibly non-contiguous) set of pages one step earlier or later.
+ * Each selected page swaps with its unselected neighbour, so gaps are preserved.
+ */
+export function movePages(pageIds, delta) {
+    const ids = new Set(pageIds);
+    const next = [...compositionPages];
+    const isMoving = page => ids.has(page.id);
+    if (delta < 0) {
+        for (let index = 1; index < next.length; index++) {
+            if (isMoving(next[index]) && !isMoving(next[index - 1])) {
+                [next[index - 1], next[index]] = [next[index], next[index - 1]];
+            }
+        }
+    } else {
+        for (let index = next.length - 2; index >= 0; index--) {
+            if (isMoving(next[index]) && !isMoving(next[index + 1])) {
+                [next[index], next[index + 1]] = [next[index + 1], next[index]];
+            }
+        }
+    }
+    if (next.every((page, index) => page === compositionPages[index])) return false;
+
+    commit(`Moved ${ids.size} page${ids.size === 1 ? '' : 's'}`, () => {
+        compositionPages = next;
+    });
+    return true;
+}
+
+/** Move a set of pages, keeping their relative order, to the start or end of the document. */
+export function movePagesTo(pageIds, position) {
+    const ids = new Set(pageIds);
+    const moving = compositionPages.filter(page => ids.has(page.id));
+    const rest = compositionPages.filter(page => !ids.has(page.id));
+    const next = position === 'start' ? [...moving, ...rest] : [...rest, ...moving];
+    if (moving.length === 0 || next.every((page, index) => page === compositionPages[index])) return false;
+
+    commit(`Moved ${moving.length} page${moving.length === 1 ? '' : 's'} to the ${position === 'start' ? 'start' : 'end'}`, () => {
         compositionPages = next;
     });
     return true;
@@ -225,6 +301,18 @@ export function addRedaction(pageId, normalizedRect) {
     commit('Added redaction', () => {
         compositionPages = compositionPages.map(item => item.id === pageId
             ? { ...item, redactions: [...item.redactions, rect] }
+            : item
+        );
+    });
+    return true;
+}
+
+export function removeRedaction(pageId, index) {
+    const page = getPage(pageId);
+    if (!page || !page.redactions[index]) return false;
+    commit('Removed a redaction', () => {
+        compositionPages = compositionPages.map(item => item.id === pageId
+            ? { ...item, redactions: item.redactions.filter((_, position) => position !== index) }
             : item
         );
     });
@@ -295,6 +383,16 @@ export function redo() {
     return entry.label;
 }
 
+/** Clear every document and page as one undoable step ("Start over"). */
+export function clearAll() {
+    if (uploadedFiles.length === 0 && compositionPages.length === 0) return false;
+    commit('Cleared all pages', () => {
+        uploadedFiles = [];
+        compositionPages = [];
+    });
+    return true;
+}
+
 export function hasFiles() {
     return uploadedFiles.length > 0;
 }
@@ -303,9 +401,15 @@ export function getTotalPageCount() {
     return compositionPages.length;
 }
 
-export function getMergePlan() {
+/**
+ * @param {Iterable<string>} [pageIds] - limit the plan to these pages (kept in document order),
+ *   for downloading just a selection.
+ */
+export function getMergePlan(pageIds) {
     const errors = [];
-    const pages = compositionPages.map((page, index) => {
+    const only = pageIds ? new Set(pageIds) : null;
+    const source = only ? compositionPages.filter(page => only.has(page.id)) : compositionPages;
+    const pages = source.map((page, index) => {
         const sourceFile = getFile(page.sourceFileId);
         if (!sourceFile) {
             errors.push(`Page ${index + 1} no longer has a source document.`);
@@ -316,7 +420,7 @@ export function getMergePlan() {
     });
 
     return {
-        name: `${outputName || 'merged'}.pdf`,
+        name: `${outputName || 'merged'}${only ? '-selected' : ''}.pdf`,
         pages,
         errors,
     };
