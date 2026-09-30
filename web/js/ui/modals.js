@@ -708,7 +708,8 @@ export function initModals(domElements, { onLightboxClose } = {}) {
     });
     elements.lightboxContent.addEventListener('pointercancel', () => { swipe = null; });
 
-    elements.pageLightbox.addEventListener('keydown', event => {
+    // Listen on the document: clicking the page itself leaves focus on <body>, outside the dialog.
+    document.addEventListener('keydown', event => {
         if (dialogStack.at(-1)?.dialog !== elements.pageLightbox) return;
         // Alt with an arrow moves the open page, like Alt with an arrow in the page grid.
         const moves = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 };
