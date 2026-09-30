@@ -232,6 +232,10 @@
                         </button>
                     </div>
                     <span class="preview-toolbar__divider" aria-hidden="true"></span>
+                    <button id="movePreviewBtn" class="preview-action" type="button" aria-label="Move page to…" aria-keyshortcuts="M" aria-expanded="false" aria-controls="movePageForm" title="Move to page… (M)">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 20V4M4 8l4-4 4 4M16 4v16M12 16l4 4 4-4"/></svg>
+                        <span>Move</span>
+                    </button>
                     <button id="rotatePreviewBtn" class="preview-action" type="button" aria-label="Rotate page" aria-keyshortcuts="R" title="Rotate (R)">
                         <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
                         <span>Rotate</span>
@@ -246,6 +250,20 @@
                     </button>
                 </div>
             </div>
+
+            <form id="movePageForm" class="move-popover hidden" aria-labelledby="movePageLabel" novalidate>
+                <div class="move-popover__row">
+                    <label id="movePageLabel" for="movePageInput">Move to page</label>
+                    <input id="movePageInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-describedby="movePageTotal movePageCurrent movePageError">
+                    <span id="movePageTotal"></span>
+                </div>
+                <p id="movePageCurrent" class="move-popover__hint"></p>
+                <p id="movePageError" class="field-error hidden" role="alert"></p>
+                <div class="move-popover__actions">
+                    <button id="cancelMovePageBtn" class="button button--quiet" type="button">Cancel</button>
+                    <button class="button button--primary" type="submit">Move</button>
+                </div>
+            </form>
 
             <div id="redactionBanner" class="redaction-banner hidden" role="region" aria-label="Redaction mode">
                 <span class="redaction-banner__dot" aria-hidden="true"></span>

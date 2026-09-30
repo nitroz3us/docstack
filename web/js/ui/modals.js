@@ -299,6 +299,8 @@ function endRedaction(event) {
 
 function setRedactMode(active) {
     filmstripSortable?.option('disabled', active);
+    if (active) closeMovePopover();
+    elements.movePreviewBtn.disabled = active;
     isRedactMode = active;
     selectedRedaction = null;
     drawing?.preview.remove();
@@ -442,6 +444,63 @@ async function setupFilmstripSorting() {
     }
 }
 
+function isMovePopoverOpen() {
+    return !elements.movePageForm.classList.contains('hidden');
+}
+
+function closeMovePopover({ restoreFocus = false } = {}) {
+    if (!isMovePopoverOpen()) return;
+    elements.movePageForm.classList.add('hidden');
+    elements.movePreviewBtn.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) elements.movePreviewBtn.focus();
+}
+
+/** "Move to page…": type a position for the open page, for moves too long to drag. */
+function openMovePopover() {
+    const total = state.compositionPages.length;
+    if (isRedactMode || total < 2) return;
+    if (isMovePopoverOpen()) {
+        closeMovePopover({ restoreFocus: true });
+        return;
+    }
+    const position = state.compositionPages.findIndex(page => page.id === currentPageId) + 1;
+    elements.movePageInput.value = String(position);
+    elements.movePageTotal.textContent = `of ${total}`;
+    elements.movePageCurrent.textContent = `Currently page ${position}`;
+    elements.movePageError.classList.add('hidden');
+    elements.movePageInput.removeAttribute('aria-invalid');
+    elements.movePageForm.classList.remove('hidden');
+    elements.movePreviewBtn.setAttribute('aria-expanded', 'true');
+
+    // Sit under the Move button, kept inside the preview.
+    const dialog = elements.movePageForm.offsetParent.getBoundingClientRect();
+    const anchor = elements.movePreviewBtn.getBoundingClientRect();
+    const width = elements.movePageForm.offsetWidth;
+    const left = Math.max(12, Math.min(anchor.right - dialog.left - width, dialog.width - width - 12));
+    elements.movePageForm.style.left = `${left}px`;
+    elements.movePageForm.style.top = `${anchor.bottom - dialog.top + 6}px`;
+    elements.movePageInput.focus();
+    elements.movePageInput.select();
+}
+
+function submitMovePopover(event) {
+    event.preventDefault();
+    const total = state.compositionPages.length;
+    const value = elements.movePageInput.value.trim();
+    const target = /^\d+$/.test(value) ? Number(value) : NaN;
+    if (!Number.isInteger(target) || target < 1 || target > total) {
+        elements.movePageError.textContent = `Enter a page from 1 to ${total}.`;
+        elements.movePageError.classList.remove('hidden');
+        elements.movePageInput.setAttribute('aria-invalid', 'true');
+        elements.movePageInput.select();
+        return;
+    }
+    closeMovePopover({ restoreFocus: true });
+    const order = state.compositionPages.map(page => page.id).filter(id => id !== currentPageId);
+    order.splice(target - 1, 0, currentPageId);
+    if (order.some((id, index) => id !== state.compositionPages[index].id)) state.setPageOrder(order);
+}
+
 /** Move the open page one place earlier or later, keeping it open. */
 function moveCurrentPage(delta) {
     if (isRedactMode) return;
@@ -479,6 +538,7 @@ async function renderLightboxPage() {
     elements.lightboxPosition.textContent = `Page ${position + 1} of ${state.compositionPages.length} · source page ${page.sourcePageIndex + 1}`;
     elements.prevPageBtn.disabled = position <= 0;
     elements.nextPageBtn.disabled = position >= state.compositionPages.length - 1;
+    elements.movePreviewBtn.disabled = isRedactMode || state.compositionPages.length < 2;
     renderFilmstrip();
 
     const renderScale = Math.min(4, 1.5 * ZOOM_LEVELS[zoomIndex]) * Math.min(2, window.devicePixelRatio || 1);
@@ -531,9 +591,10 @@ export async function showPageLightbox(pageId, trigger) {
     filmstripKey = null;
     openDialog(elements.pageLightbox, trigger, {
         initialFocus: elements.closeLightbox,
-        // Escape steps back one level: deselect a box, then leave redaction, then close.
+        // Escape steps back one level: close the move box, deselect a box, leave redaction, then close.
         escape: () => {
-            if (isRedactMode && selectedRedaction !== null) selectRedaction(null);
+            if (isMovePopoverOpen()) closeMovePopover({ restoreFocus: true });
+            else if (isRedactMode && selectedRedaction !== null) selectRedaction(null);
             else if (isRedactMode) setRedactMode(false);
             else hideLightbox();
         },
@@ -544,6 +605,7 @@ export async function showPageLightbox(pageId, trigger) {
 
 export function hideLightbox() {
     const closedPageId = currentPageId;
+    closeMovePopover();
     setRedactMode(false);
     closeDialog(elements.pageLightbox, { restoreFocus: !lightboxCloseHandler });
     currentPageId = null;
@@ -657,6 +719,14 @@ export function initModals(domElements, { onLightboxClose } = {}) {
     elements.prevPageBtn.addEventListener('click', () => changeLightboxPage(-1));
     elements.nextPageBtn.addEventListener('click', () => changeLightboxPage(1));
     elements.redactModeBtn.addEventListener('click', toggleRedactMode);
+    elements.movePreviewBtn.addEventListener('click', openMovePopover);
+    elements.movePageForm.addEventListener('submit', submitMovePopover);
+    elements.cancelMovePageBtn.addEventListener('click', () => closeMovePopover({ restoreFocus: true }));
+    elements.pageLightbox.addEventListener('pointerdown', event => {
+        if (!isMovePopoverOpen()) return;
+        if (elements.movePageForm.contains(event.target) || elements.movePreviewBtn.contains(event.target)) return;
+        closeMovePopover();
+    });
     elements.finishRedactionBtn.addEventListener('click', () => setRedactMode(false));
     elements.clearRedactionsBtn.addEventListener('click', () => {
         selectedRedaction = null;
@@ -711,10 +781,11 @@ export function initModals(domElements, { onLightboxClose } = {}) {
     // Listen on the document: clicking the page itself leaves focus on <body>, outside the dialog.
     document.addEventListener('keydown', event => {
         if (dialogStack.at(-1)?.dialog !== elements.pageLightbox) return;
+        // Typing in the "Move to page" box must not zoom, rotate or delete.
+        if (event.target.closest?.('input, textarea')) return;
         // Alt with an arrow moves the open page, like Alt with an arrow in the page grid.
         const moves = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 };
         if (event.altKey && !event.metaKey && !event.ctrlKey && moves[event.key]) {
-            if (event.target.closest?.('input, textarea')) return;
             event.preventDefault();
             moveCurrentPage(moves[event.key]);
             return;
@@ -740,6 +811,8 @@ export function initModals(domElements, { onLightboxClose } = {}) {
             ArrowRight: () => changeLightboxPage(1),
             r: rotatePreviewPage,
             R: rotatePreviewPage,
+            m: openMovePopover,
+            M: openMovePopover,
             Delete: removeBoxOrPage,
             Backspace: removeBoxOrPage,
             '+': () => setZoom(zoomIndex + 1),

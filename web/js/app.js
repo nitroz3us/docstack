@@ -42,7 +42,7 @@ const elementIds = [
     'showPasswordCheckbox', 'closePasswordModal', 'cancelPasswordBtn', 'submitPasswordBtn',
     'encryptionWarningModal', 'encryptionWarningTitle', 'warningFileList', 'cancelWarningBtn', 'proceedWarningBtn',
     'redactionWarningModal', 'redactionWarningTitle', 'cancelRedactionBtn', 'proceedRedactionBtn',
-    'zoomInBtn', 'zoomOutBtn', 'zoomFitBtn', 'rotatePreviewBtn', 'deletePreviewBtn', 'lightboxSpinner',
+    'zoomInBtn', 'zoomOutBtn', 'zoomFitBtn', 'movePreviewBtn', 'movePageForm', 'movePageInput', 'movePageTotal', 'movePageCurrent', 'movePageError', 'cancelMovePageBtn', 'rotatePreviewBtn', 'deletePreviewBtn', 'lightboxSpinner',
     'toastRegion', 'dropOverlay', 'dropOverlayHint',
     'exportProgressModal', 'exportProgressTitle', 'exportProgressText', 'exportProgressIndicator', 'exportProgressBar', 'cancelExportBtn',
 ];
