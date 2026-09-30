@@ -11,6 +11,22 @@ function copyInto(canvas, source) {
     canvas.getContext('2d', { alpha: false }).drawImage(source, 0, 0);
 }
 
+function cacheKey(page) {
+    return `${page.sourceFileId}:${page.sourcePageIndex}:${page.rotation}`;
+}
+
+/**
+ * Draw an already-rendered thumbnail into `canvas` right away. Used when the grid is rebuilt,
+ * so pages keep their pictures instead of blinking to a placeholder. Returns whether it drew.
+ */
+export function paintCachedThumbnail(canvas, page) {
+    const cached = cache.get(cacheKey(page));
+    if (!cached) return false;
+    copyInto(canvas, cached);
+    canvas.dataset.rendered = 'true';
+    return true;
+}
+
 /**
  * Draw a page thumbnail into `canvas`, rendering it once per source page and rotation.
  * Resolves when drawn; rejects if the page cannot be rendered.
@@ -18,7 +34,7 @@ function copyInto(canvas, source) {
 export async function drawPageThumbnail(canvas, page, file) {
     if (canvas.dataset.rendered === 'true' || canvas.dataset.rendering === 'true') return;
     canvas.dataset.rendering = 'true';
-    const key = `${page.sourceFileId}:${page.sourcePageIndex}:${page.rotation}`;
+    const key = cacheKey(page);
     try {
         const cached = cache.get(key);
         if (cached) {

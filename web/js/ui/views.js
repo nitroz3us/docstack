@@ -1,7 +1,7 @@
 import * as state from '../state.js';
 import { createPageRun, createPageTile } from './components.js';
 import { showMenu } from './menu.js';
-import { drawPageThumbnail, pruneThumbnails } from './thumbnails.js';
+import { drawPageThumbnail, paintCachedThumbnail, pruneThumbnails } from './thumbnails.js';
 
 let elements = null;
 let handlers = null;
@@ -214,9 +214,13 @@ function renderPages() {
         const run = createPageRun(file, pages.map(page => page.sourcePageIndex + 1), startIndex);
         const container = run.querySelector('.page-run__pages');
         pages.forEach((page, offset) => {
-            container.appendChild(createPageTile(page, file, startIndex + offset, state.selectedPageIds.has(page.id), {
+            const tile = createPageTile(page, file, startIndex + offset, state.selectedPageIds.has(page.id), {
                 isLastInRun: offset === pages.length - 1,
-            }));
+            });
+            if (paintCachedThumbnail(tile.querySelector('.page-canvas'), page)) {
+                tile.querySelector('.thumbnail-spinner')?.remove();
+            }
+            container.appendChild(tile);
         });
         fragment.appendChild(run);
     });
