@@ -83,8 +83,6 @@ function openInsertMenu(anchor, index) {
 }
 
 async function processFiles(fileList, { insertAt = null } = {}) {
-    elements.dropZone.dataset.state = 'loading';
-    elements.browseBtn.disabled = true;
     const hadFiles = state.hasFiles();
     const where = hadFiles && insertAt !== null ? ` ${describePosition(insertAt)}` : '';
     const { added } = await handleFiles(fileList, {
