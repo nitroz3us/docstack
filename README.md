@@ -10,10 +10,11 @@
 
 **Arrange pages**
 - Drop in several PDFs and see every page at once, grouped by the file it came from.
+- Add images (JPG, PNG, WebP, GIF, BMP, AVIF) too: each becomes a page you can arrange, rotate and redact like any other. Photos keep their full resolution and are turned upright if the camera saved them sideways.
 - Drag pages to reorder them, including several selected pages at once and between files.
 - Select like a file manager: click, <kbd>⌘</kbd>/<kbd>Ctrl</kbd>‑click, <kbd>Shift</kbd>‑click, or drag a box around pages.
 - Rotate, delete, move to the start or end, or extract just the selected pages as their own PDF.
-- Insert a PDF or a blank page anywhere. Blank pages match the size of the pages around them.
+- Insert a PDF, an image or a blank page anywhere. Blank pages match the size of the pages around them.
 - Drop new files exactly where you want them: a line shows where they will land.
 
 **Preview and redact**
@@ -29,7 +30,7 @@
 
 ## Privacy
 
-- **No uploads.** PDFs are opened, rendered and merged in your browser with [PDF.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/). No file or page is ever sent to a server.
+- **No uploads.** PDFs and images are opened, rendered and merged in your browser with [PDF.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/). No file or page is ever sent to a server.
 - **No third-party requests.** All libraries are served from this repository, and the interface uses your system's fonts. There are no analytics or trackers.
 - **Works offline.** Everything docstack needs is loaded when the page opens. After that you can turn off Wi‑Fi and keep working.
 
@@ -88,6 +89,7 @@ web/
     state.js            the document: pages, order, rotation, redactions, undo history
     app.js              wiring, shortcuts, file loading and downloads
     handlers/           opening files, merging, blank pages
+    utils/              PDF.js loading, image-to-PDF conversion, helpers
     ui/                 page grid, preview and dialogs, menus, toasts
   lib/                  PDF.js, pdf-lib and SortableJS, served locally
   assets/               favicon, touch icon and link-preview image

@@ -125,7 +125,7 @@ function hasDraggedFiles(event) {
 function setDropOverlay(visible) {
     // With no pages, the whole window is the drop target; with pages, show exactly where files land.
     const hasPages = state.compositionPages.length > 0;
-    elements.dropOverlayHint.textContent = 'PDF files only · processed on this device';
+    elements.dropOverlayHint.textContent = 'PDFs and images · processed on this device';
     elements.dropOverlay.classList.toggle('hidden', !visible || hasPages);
     if (!state.hasFiles()) elements.dropZone.dataset.state = visible ? 'dragover' : 'idle';
     if (!visible) {

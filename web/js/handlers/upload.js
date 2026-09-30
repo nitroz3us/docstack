@@ -1,6 +1,7 @@
 import * as state from '../state.js';
 import { generateId } from '../utils/helpers.js';
 import { getPageCount, hasPdfSignature, loadPdfDocument } from '../utils/pdf.js';
+import { imageToPdf, looksLikeImage } from '../utils/image.js';
 import { showPasswordModal } from '../ui/modals.js';
 
 function looksLikePdf(file) {
@@ -15,11 +16,11 @@ function looksLikePdf(file) {
  */
 export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
     const candidates = Array.from(fileList);
-    const files = candidates.filter(looksLikePdf);
+    const files = candidates.filter(file => looksLikePdf(file) || looksLikeImage(file));
     const ignored = candidates.length - files.length;
 
     if (ignored > 0) {
-        callbacks.onError?.(`${ignored} non-PDF file${ignored === 1 ? ' was' : 's were'} ignored.`);
+        callbacks.onError?.(`${ignored} unsupported file${ignored === 1 ? ' was' : 's were'} ignored. Add PDFs or images.`);
     }
     if (files.length === 0) return { added: 0, ignored };
 
@@ -33,12 +34,16 @@ export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
             callbacks.onProgress?.(index, files.length, `Opening ${file.name}`);
 
             try {
-                if (!await hasPdfSignature(file)) {
+                let arrayBuffer;
+                if (await hasPdfSignature(file)) {
+                    arrayBuffer = await file.arrayBuffer();
+                } else if (looksLikeImage(file)) {
+                    arrayBuffer = await imageToPdf(file);
+                } else {
                     callbacks.onError?.(`${file.name} does not contain valid PDF data.`);
                     continue;
                 }
 
-                const arrayBuffer = await file.arrayBuffer();
                 let pdfProxy = null;
                 let password = null;
                 let showError = false;

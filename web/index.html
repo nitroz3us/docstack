@@ -79,9 +79,9 @@
                         <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 7l5 5-5 5"/><path d="M19 12h-8a6 6 0 00-6 6"/></svg>
                     </button>
                 </div>
-                <button id="addFilesBtn" class="button button--secondary add-files-button needs-files" type="button" aria-label="Add PDFs">
+                <button id="addFilesBtn" class="button button--secondary add-files-button needs-files" type="button" aria-label="Add PDFs or images">
                     <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-                    <span class="add-files-button__label">Add PDFs</span>
+                    <span class="add-files-button__label">Add files</span>
                 </button>
                 <div class="split-button needs-files desktop-only">
                     <button id="exportBtn" class="button button--primary split-button__main" type="button">Download</button>
@@ -106,12 +106,12 @@
 
             <section id="pagesPanel" class="pages-panel" aria-labelledby="pagesTitle">
                 <div id="dropZone" class="drop-zone" data-state="idle">
-                    <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden>
+                    <input id="fileInput" type="file" accept="application/pdf,.pdf,image/*" multiple hidden>
                     <div class="drop-zone__pages" aria-hidden="true"><span></span><span></span><span></span></div>
                     <h1 id="landingTitle">Merge and arrange PDFs, privately.</h1>
                     <p class="drop-zone__lede">Nothing is uploaded. Every page is handled on this device, so docstack keeps working with Wi‑Fi turned off.</p>
-                    <button id="browseBtn" class="button button--primary drop-zone__button" type="button">Choose PDFs</button>
-                    <p class="drop-zone__hint">or drop PDF files anywhere on this page</p>
+                    <button id="browseBtn" class="button button--primary drop-zone__button" type="button">Choose files</button>
+                    <p class="drop-zone__hint">or drop PDFs and images anywhere on this page</p>
                     <p class="drop-zone__verbs">Reorder · Rotate · Delete · Redact · Merge</p>
                 </div>
 
@@ -139,7 +139,7 @@
                 <div id="pagesEmptyState" class="pages-empty hidden">
                     <h3>No pages in this composition</h3>
                     <p>Add another PDF or undo your last deletion.</p>
-                    <button id="emptyAddFilesBtn" class="button button--secondary" type="button">Add PDFs</button>
+                    <button id="emptyAddFilesBtn" class="button button--secondary" type="button">Add files</button>
                 </div>
                 <div id="pageGrid" class="page-grid" role="listbox" aria-multiselectable="true" aria-label="Pages in download order" aria-describedby="pageGridHelp"></div>
                 <p id="pageGridHelp" class="sr-only">Arrow keys move between pages. Shift with an arrow key extends the selection. Space or Enter opens a page. Alt with an arrow key moves the selected pages.</p>
@@ -205,8 +205,8 @@
     <div id="dropOverlay" class="drop-overlay hidden" aria-hidden="true">
         <div class="drop-overlay__panel">
             <svg viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7 9l5-5 5 5"/><path d="M5 15v3a2 2 0 002 2h10a2 2 0 002-2v-3"/></svg>
-            <strong>Drop PDFs to add them</strong>
-            <span id="dropOverlayHint">PDF files only</span>
+            <strong>Drop files to add them</strong>
+            <span id="dropOverlayHint">PDFs and images</span>
         </div>
     </div>
 
