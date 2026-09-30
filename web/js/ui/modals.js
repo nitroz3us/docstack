@@ -1,8 +1,9 @@
 import * as state from '../state.js';
 import { renderPdfPage } from '../utils/pdf.js';
 import { showToast } from './toast.js';
-import { drawPageThumbnail } from './thumbnails.js';
+import { drawPageThumbnail, paintCachedThumbnail } from './thumbnails.js';
 import { renderThumbnailRedactions } from './components.js';
+import { ensureSortable } from './views.js';
 
 let elements = null;
 const dialogStack = [];
@@ -15,6 +16,10 @@ let drawing = null;
 let selectedRedaction = null;
 let filmstripKey = null;
 let filmstripObserver = null;
+let filmstripSortable = null;
+// After a drop, keep the strip where the page landed instead of scrolling back to the open page.
+let keepFilmstripScroll = false;
+let filmstripDragEndedAt = 0;
 let swipe = null;
 let shownPageId = null;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -293,6 +298,7 @@ function endRedaction(event) {
 }
 
 function setRedactMode(active) {
+    filmstripSortable?.option('disabled', active);
     isRedactMode = active;
     selectedRedaction = null;
     drawing?.preview.remove();
@@ -319,6 +325,10 @@ function renderFilmstrip() {
     const key = pages.map(page => `${page.id}:${page.rotation}`).join('|');
     if (key !== filmstripKey) {
         filmstripKey = key;
+        // Rebuilding replaces the buttons, so carry keyboard focus over to the same page.
+        const focusedPageId = elements.lightboxFilmstrip.contains(document.activeElement)
+            ? document.activeElement.closest('.filmstrip__item')?.dataset.pageId
+            : null;
         filmstripObserver?.disconnect();
         filmstripObserver = new IntersectionObserver(entries => {
             entries.forEach(entry => {
@@ -343,6 +353,7 @@ function renderFilmstrip() {
             canvas.width = sideways ? 22 : 17;
             canvas.height = sideways ? 17 : 22;
             canvas.dataset.rendered = 'false';
+            paintCachedThumbnail(canvas, page);
             // The paper wrapper hugs the canvas so redaction boxes line up with the page.
             const paper = document.createElement('span');
             paper.className = 'filmstrip__paper';
@@ -356,6 +367,9 @@ function renderFilmstrip() {
             filmstripObserver.observe(item);
         });
         elements.lightboxFilmstrip.replaceChildren(fragment);
+        if (focusedPageId) {
+            elements.lightboxFilmstrip.querySelector(`[data-page-id="${focusedPageId}"]`)?.focus({ preventScroll: true });
+        }
     }
 
     elements.lightboxFilmstrip.querySelectorAll('.filmstrip__item').forEach((item, index) => {
@@ -366,7 +380,72 @@ function renderFilmstrip() {
         if (item.dataset.pageId === currentPageId) item.setAttribute('aria-current', 'page');
         else item.removeAttribute('aria-current');
     });
-    elements.lightboxFilmstrip.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (keepFilmstripScroll) keepFilmstripScroll = false;
+    else elements.lightboxFilmstrip.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+/**
+ * Sortable's floating copy is a plain DOM clone, which drops canvas pixels. Once it exists,
+ * paint the thumbnail into it.
+ */
+function paintFilmstripDragCopy(item, attempt = 0) {
+    const copy = document.querySelector('body > .filmstrip__item--dragging');
+    if (!copy) {
+        if (attempt < 20) requestAnimationFrame(() => paintFilmstripDragCopy(item, attempt + 1));
+        return;
+    }
+    const source = item.querySelector('canvas');
+    const target = copy.querySelector('canvas');
+    if (source?.dataset.rendered !== 'true' || !target) return;
+    target.width = source.width;
+    target.height = source.height;
+    target.dataset.rendered = 'true';
+    target.getContext('2d', { alpha: false }).drawImage(source, 0, 0);
+}
+
+/** Drag pages in the preview's strip to reorder the document, like in the page grid. */
+async function setupFilmstripSorting() {
+    if (filmstripSortable) return;
+    try {
+        const Sortable = await ensureSortable();
+        if (filmstripSortable) return;
+        filmstripSortable = new Sortable(elements.lightboxFilmstrip, {
+            animation: 160,
+            draggable: '.filmstrip__item',
+            forceFallback: true,
+            fallbackTolerance: 4,
+            fallbackOnBody: true,
+            fallbackClass: 'filmstrip__item--dragging',
+            ghostClass: 'filmstrip__item--ghost',
+            // On touch screens, press and hold to lift a page so the strip still scrolls.
+            delay: 150,
+            delayOnTouchOnly: true,
+            disabled: isRedactMode,
+            onStart: ({ item }) => paintFilmstripDragCopy(item),
+            onEnd: ({ item }) => {
+                filmstripDragEndedAt = performance.now();
+                const order = [...elements.lightboxFilmstrip.querySelectorAll('.filmstrip__item')].map(entry => entry.dataset.pageId);
+                if (!order.every((id, index) => id === state.compositionPages[index]?.id)) {
+                    keepFilmstripScroll = true;
+                    if (!state.setPageOrder(order)) {
+                        keepFilmstripScroll = false;
+                        filmstripKey = null;
+                        renderFilmstrip();
+                    }
+                }
+                // Moving the pressed button during the drag drops its focus; give it back so shortcuts keep working.
+                elements.lightboxFilmstrip.querySelector(`[data-page-id="${item.dataset.pageId}"]`)?.focus({ preventScroll: true });
+            },
+        });
+    } catch (error) {
+        showToast(error.message || 'Page reordering could not be loaded.', { tone: 'error' });
+    }
+}
+
+/** Move the open page one place earlier or later, keeping it open. */
+function moveCurrentPage(delta) {
+    if (isRedactMode) return;
+    state.movePage(currentPageId, delta);
 }
 
 function isLightboxOpen() {
@@ -459,6 +538,7 @@ export async function showPageLightbox(pageId, trigger) {
             else hideLightbox();
         },
     });
+    setupFilmstripSorting();
     await renderLightboxPage();
 }
 
@@ -604,6 +684,8 @@ export function initModals(domElements, { onLightboxClose } = {}) {
 
     elements.lightboxFilmstrip.addEventListener('click', event => {
         const item = event.target.closest('.filmstrip__item');
+        // Dropping a dragged page shouldn't also open it.
+        if (performance.now() - filmstripDragEndedAt < 300) return;
         if (!item || item.dataset.pageId === currentPageId) return;
         setRedactMode(false);
         currentPageId = item.dataset.pageId;
@@ -628,6 +710,14 @@ export function initModals(domElements, { onLightboxClose } = {}) {
 
     elements.pageLightbox.addEventListener('keydown', event => {
         if (dialogStack.at(-1)?.dialog !== elements.pageLightbox) return;
+        // Alt with an arrow moves the open page, like Alt with an arrow in the page grid.
+        const moves = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 };
+        if (event.altKey && !event.metaKey && !event.ctrlKey && moves[event.key]) {
+            if (event.target.closest?.('input, textarea')) return;
+            event.preventDefault();
+            moveCurrentPage(moves[event.key]);
+            return;
+        }
         if (event.metaKey || event.ctrlKey || event.altKey) return;
         const onBox = event.target.closest?.('.redaction-box');
         if (onBox && (event.key === 'Enter' || event.key === ' ')) {

@@ -18,7 +18,7 @@
 - Drop new files exactly where you want them: a line shows where they will land.
 
 **Preview and redact**
-- Open any page full-window, with a thumbnail strip, zoom, rotate and delete.
+- Open any page full-window, with a thumbnail strip, zoom, rotate and delete. Drag pages in the strip to reorder them without leaving the preview.
 - Redact by drawing boxes over text or images. Each box can be selected and removed, and thumbnails show exactly what will be covered.
 - Redacted pages are exported as images, so the covered content cannot be selected, copied or recovered.
 
@@ -54,6 +54,7 @@
 | In the preview | |
 |---|---|
 | <kbd>←</kbd> <kbd>→</kbd> | Previous or next page |
+| <kbd>Alt</kbd> + arrow | Move the page earlier or later |
 | <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> | Zoom in, zoom out, fit to window |
 | <kbd>R</kbd> | Rotate the page |
 | <kbd>Delete</kbd> | Delete the page, or the selected redaction box while redacting |

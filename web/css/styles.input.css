@@ -334,6 +334,10 @@
     .filmstrip__item:hover canvas { box-shadow: 0 0 0 2px var(--border-strong), var(--shadow-paper); }
     .filmstrip__item[aria-current="page"] canvas { box-shadow: 0 0 0 2px var(--accent), var(--shadow-paper); }
     .filmstrip__item[aria-current="page"] .filmstrip__number { color: var(--accent); }
+    .filmstrip__item--ghost { opacity: .3; }
+    .filmstrip__item--dragging { opacity: 1 !important; }
+    .filmstrip__item--dragging canvas { transform: rotate(2deg); box-shadow: var(--shadow-md); }
+    .filmstrip__item--dragging .filmstrip__number { visibility: hidden; }
 
     .viewer-stage { position: relative; min-width: 0; min-height: 0; display: flex; }
     .preview-canvas-wrap { position: relative; flex: 1; display: flex; min-height: 0; overflow: auto; background: var(--desk); padding: 28px 76px 36px; touch-action: pan-y pinch-zoom; }
