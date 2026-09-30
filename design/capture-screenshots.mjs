@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Captures the README screenshots (docs/screenshot-workspace.png, docs/screenshot-preview.png)
- * from the real app, using made-up sample PDFs.
+ * from the real app, using made-up sample PDFs and a sample photo.
  *
  *   node design/capture-screenshots.mjs
  *
@@ -121,12 +121,58 @@ const LOAD_SAMPLES = String(async function loadSamples() {
         (d, r, b) => { const p = portrait(d); p.drawText('Signatures', { x: 56, y: 720, size: 20, font: b, color: ink }); [56, 330].forEach((x, i) => { p.drawLine({ start: { x, y: 560 }, end: { x: x + 220, y: 560 }, thickness: 1, color: ink }); p.drawText(i ? 'Harbor Logistics · 2 Sep 2026' : 'Northwind Freight · 2 Sep 2026', { x, y: 542, size: 10, font: r, color: muted }); }); },
     ]);
 
+    // A phone photo of a fuel receipt, to show images going in alongside PDFs.
+    async function receiptPhoto() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1200;
+        canvas.height = 1600;
+        const c = canvas.getContext('2d');
+        const table = c.createLinearGradient(0, 0, 1200, 1600);
+        table.addColorStop(0, '#8a6a4f');
+        table.addColorStop(1, '#5e4634');
+        c.fillStyle = table;
+        c.fillRect(0, 0, 1200, 1600);
+        c.translate(600, 800);
+        c.rotate(-0.035);
+        c.shadowColor = 'rgba(0, 0, 0, 0.35)';
+        c.shadowBlur = 40;
+        c.shadowOffsetY = 12;
+        c.fillStyle = '#f7f5ef';
+        c.fillRect(-340, -660, 680, 1320);
+        c.shadowColor = 'transparent';
+        c.fillStyle = '#26272b';
+        c.textAlign = 'center';
+        c.font = 'bold 54px monospace';
+        c.fillText('NORTHSTAR FUEL', 0, -540);
+        c.font = '30px monospace';
+        c.fillText('Route 9 · Pump 4', 0, -490);
+        c.fillText('02/09/2026  06:42', 0, -450);
+        c.textAlign = 'left';
+        [['Diesel 412.6 L', '688.04'], ['AdBlue 20 L', '31.80'], ['Coffee', '2.90']].forEach(([label, value], i) => {
+            const y = -340 + i * 64;
+            c.fillText(label, -280, y);
+            c.fillText(value, 150, y);
+        });
+        c.fillRect(-280, -120, 560, 3);
+        c.font = 'bold 40px monospace';
+        c.fillText('TOTAL', -280, -50);
+        c.fillText('722.74', 120, -50);
+        c.font = '30px monospace';
+        c.fillText('Card  **** 6411', -280, 40);
+        c.fillText('Fleet ID  NW-TRK-118', -280, 90);
+        c.textAlign = 'center';
+        for (let x = -240; x < 240; x += 8) c.fillRect(x, 300, x % 24 === 0 ? 5 : 2, 120);
+        c.fillText('Thank you · Drive safe', 0, 520);
+        const blob = await new Promise(done => canvas.toBlob(done, 'image/jpeg', 0.9));
+        return new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
+    }
+
     const input = document.getElementById('fileInput');
     const transfer = new DataTransfer();
-    [report, invoice, nda].forEach(file => transfer.items.add(file));
+    [report, invoice, nda, await receiptPhoto()].forEach(file => transfer.items.add(file));
     input.files = transfer.files;
     input.dispatchEvent(new Event('change'));
-    const expected = 10;
+    const expected = 11;
     while (document.querySelectorAll('.page-canvas[data-rendered="true"]').length < expected) await new Promise(done => setTimeout(done, 100));
     return document.querySelectorAll('.page-tile').length;
 });
@@ -136,6 +182,7 @@ const SCENE_WORKSPACE = String(async function sceneWorkspace() {
     const ids = state.compositionPages.map(page => page.id);
     state.setSelectedPageIds([ids[1], ids[2]]);
     document.querySelectorAll('.toast').forEach(toast => toast.remove());
+    while (!document.getElementById('renderProgress').classList.contains('hidden')) await new Promise(done => setTimeout(done, 100));
     window.scrollTo(0, 0);
     await new Promise(done => setTimeout(done, 400));
 });

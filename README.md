@@ -4,7 +4,7 @@
 
 [docstack.tools](https://docstack.tools)
 
-![The docstack workspace: pages from three PDFs grouped by file, with two pages selected and the selection bar showing Rotate, Insert, Extract and Delete](docs/screenshot-workspace.png)
+![The docstack workspace: pages from three PDFs and a photographed receipt grouped by file, with two pages selected and the selection bar showing Rotate, Insert, Extract and Delete](docs/screenshot-workspace.png)
 
 ## Features
 
@@ -100,7 +100,7 @@ test/                   tests
 
 ### Regenerating images
 
-- **README screenshots:** `node design/capture-screenshots.mjs` opens the app in headless Chrome with made-up sample PDFs and saves `docs/screenshot-*.png`. It needs Node 22+ and Google Chrome; set `CHROME_PATH` if Chrome is not in the default macOS location.
+- **README screenshots:** `node design/capture-screenshots.mjs` opens the app in headless Chrome with made-up sample PDFs and a sample photo and saves `docs/screenshot-*.png`. It needs Node 22+ and Google Chrome; set `CHROME_PATH` if Chrome is not in the default macOS location.
 - **Link-preview image:** the command is in the comment at the top of `design/social-card.html`.
 - **Touch icon:** render `design/apple-touch-icon.svg` the same way at 180×180, saving to `web/assets/apple-touch-icon.png`.
 
