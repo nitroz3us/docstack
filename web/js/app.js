@@ -404,7 +404,7 @@ function initializeInteractions() {
         title: 'Your files never leave this device',
         paragraphs: [
             'docstack reads, arranges and merges PDFs inside this browser tab. No file is uploaded and no page is sent anywhere.',
-            'To check, turn off Wi‑Fi once the page has loaded and keep working. Everything still works.',
+            'To check, turn off Wi‑Fi once the page has loaded and keep working. PDFs and images still work.',
             'One exception: the first time you add a PowerPoint or Word file, docstack downloads the tool that converts it (about 50 MB) from ZetaOffice. The file itself is still converted on this device.',
         ],
     }));
