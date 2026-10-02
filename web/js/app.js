@@ -405,7 +405,7 @@ function initializeInteractions() {
         paragraphs: [
             'docstack reads, arranges and merges PDFs inside this browser tab. No file is uploaded and no page is sent anywhere.',
             'To check, turn off Wi‑Fi once the page has loaded and keep working. Everything still works.',
-            'One exception: the first time you add a PowerPoint or Word file, a converter (about 50 MB) is downloaded from ZetaOffice. The file itself is still converted on this device.',
+            'One exception: the first time you add a PowerPoint or Word file, docstack downloads the tool that converts it (about 50 MB) from ZetaOffice. The file itself is still converted on this device.',
         ],
     }));
     // Size the file name field to its text so the title reads like a document name, not a form.

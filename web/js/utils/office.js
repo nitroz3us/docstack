@@ -54,7 +54,7 @@ async function assertEngineReachable() {
         const response = await fetch(`${ENGINE_URL}soffice.js`, { method: 'HEAD' });
         if (!response.ok) throw new Error(String(response.status));
     } catch {
-        throw new Error('The converter could not be downloaded. Check your connection and try again.');
+        throw new Error('The conversion tool could not be downloaded. Check your connection and try again.');
     }
 }
 
@@ -62,7 +62,7 @@ async function startOffice(onStatus) {
     await assertEngineReachable();
     const { ZetaHelperMain } = await import('../../lib/zetajs/zetaHelper.js');
     return new Promise((resolve, reject) => {
-        const timer = window.setTimeout(() => reject(new Error('The converter took too long to load.')), START_TIMEOUT_MS);
+        const timer = window.setTimeout(() => reject(new Error('The conversion tool took too long to load.')), START_TIMEOUT_MS);
         // The engine expects a canvas for its (unused) interface.
         if (!document.getElementById('qtcanvas')) {
             const canvas = document.createElement('canvas');

@@ -72,7 +72,7 @@ export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
                         onStatus: ({ loaded, total }) => callbacks.onProgress?.(
                             index,
                             files.length,
-                            `Loading the converter (about 50 MB the first time) · ${Math.round((loaded / total) * 100)}%`
+                            `Loading the conversion tool (about 50 MB the first time) · ${Math.round((loaded / total) * 100)}%`
                         ),
                     });
                 } else {
