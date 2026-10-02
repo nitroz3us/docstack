@@ -10,8 +10,15 @@
 
 // The one third-party request docstack makes: the engine is too large to ship in this repository.
 const ENGINE_URL = 'https://cdn.zetaoffice.net/zetaoffice_latest/';
-const START_TIMEOUT_MS = 180000;
+// How long each step of starting the engine may go without progress before giving up. The engine
+// file (about 36 MB) reports no progress while it downloads, so it gets the longest allowance;
+// starting up normally takes a few seconds.
+const ENGINE_DOWNLOAD_TIMEOUT_MS = 120000;
+const DATA_STALL_TIMEOUT_MS = 45000;
+const ENGINE_START_TIMEOUT_MS = 45000;
 const CONVERT_TIMEOUT_MS = 180000;
+// A half-started or stuck engine cannot be restarted inside the same page.
+const RELOAD_HINT = 'Reload the page and try again.';
 
 const KINDS = [
     { name: 'presentation', extensions: /\.(pptx?|odp)$/i, filter: 'impress_pdf_Export' },
@@ -19,6 +26,7 @@ const KINDS = [
 ];
 
 let officePromise = null;
+let engineFailed = false;
 let nextId = 0;
 const pending = new Map();
 let queue = Promise.resolve();
@@ -62,7 +70,15 @@ async function startOffice(onStatus) {
     await assertEngineReachable();
     const { ZetaHelperMain } = await import('../../lib/zetajs/zetaHelper.js');
     return new Promise((resolve, reject) => {
-        const timer = window.setTimeout(() => reject(new Error('The conversion tool took too long to load.')), START_TIMEOUT_MS);
+        let watchdog = 0;
+        const allow = milliseconds => {
+            window.clearTimeout(watchdog);
+            watchdog = window.setTimeout(() => {
+                engineFailed = true;
+                reject(new Error(`The conversion tool did not start. ${RELOAD_HINT}`));
+            }, milliseconds);
+        };
+        allow(ENGINE_DOWNLOAD_TIMEOUT_MS);
         // The engine expects a canvas for its (unused) interface.
         if (!document.getElementById('qtcanvas')) {
             const canvas = document.createElement('canvas');
@@ -84,12 +100,13 @@ async function startOffice(onStatus) {
             const loaded = Number(match[1]);
             const total = Number(match[2]);
             starting = loaded >= total;
+            allow(starting ? ENGINE_START_TIMEOUT_MS : DATA_STALL_TIMEOUT_MS);
             onStatus?.(starting ? { stage: 'start' } : { stage: 'download', loaded, total });
         };
         helper.start(() => {
             helper.thrPort.onmessage = ({ data }) => {
                 if (data.cmd === 'ready') {
-                    window.clearTimeout(timer);
+                    window.clearTimeout(watchdog);
                     resolve(helper);
                     return;
                 }
@@ -104,6 +121,7 @@ async function startOffice(onStatus) {
 }
 
 function ensureOffice(onStatus) {
+    if (engineFailed) return Promise.reject(new Error(`The conversion tool stopped working. ${RELOAD_HINT}`));
     if (!officePromise) {
         officePromise = startOffice(onStatus);
         officePromise.catch(() => { officePromise = null; });
@@ -129,7 +147,9 @@ async function convert(file, { onStatus } = {}) {
         await new Promise((resolve, reject) => {
             const timer = window.setTimeout(() => {
                 pending.delete(id);
-                reject(new Error('The conversion took too long.'));
+                // The engine is still busy with this file, so later files would only queue behind it.
+                engineFailed = true;
+                reject(new Error(`The conversion took too long. ${RELOAD_HINT}`));
             }, CONVERT_TIMEOUT_MS);
             pending.set(id, {
                 resolve: () => { window.clearTimeout(timer); resolve(); },
