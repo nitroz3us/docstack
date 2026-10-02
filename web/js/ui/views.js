@@ -320,18 +320,49 @@ export function setDensity(density) {
 }
 
 let progressHideTimer = 0;
+let progressCreepTimer = 0;
 
-/** A slim bar under the header while files open; it overlays the page so nothing shifts. */
-export function showPreviewProgress(current, total, label = 'Opening documents') {
+/**
+ * A slim bar under the header while files open; it overlays the page so nothing shifts.
+ *
+ * @param {number} current - index of the file being opened
+ * @param {number} total - number of files
+ * @param {string} [label]
+ * @param {{fraction?: number, creepTo?: number, creepSeconds?: number}} [step] - how far through
+ *   the current file the work is (0 to 1). For a step of unknown length, `creepTo` keeps the bar
+ *   moving slowly towards that fraction over `creepSeconds` instead of standing still.
+ */
+export function showPreviewProgress(current, total, label = 'Opening documents', { fraction = 0.5, creepTo, creepSeconds = 8 } = {}) {
     const done = current >= total;
-    const percent = total > 0 ? Math.round((Math.min(current + (done ? 0 : 0.5), total) / total) * 100) : 0;
+    const percentAt = part => (total > 0 ? Math.round((Math.min(current + (done ? 0 : part), total) / total) * 1000) / 10 : 0);
+    const percent = percentAt(fraction);
+    const bar = elements.renderProgressBar;
+    const panel = elements.renderProgress;
+    // A new run starts from empty; within a run the bar only ever moves forward.
+    const fresh = panel.classList.contains('hidden') || panel.classList.contains('progress-panel--done');
     window.clearTimeout(progressHideTimer);
+    window.clearTimeout(progressCreepTimer);
     elements.renderProgress.classList.remove('hidden', 'progress-panel--done');
-    elements.renderProgress.setAttribute('aria-valuenow', String(percent));
+    elements.renderProgress.setAttribute('aria-valuenow', String(Math.round(percent)));
     elements.renderProgressText.textContent = done
         ? `${total === 1 ? 'Document' : `${total} documents`} ready`
         : `${label}${total > 1 ? ` · ${current + 1} of ${total}` : ''}`;
-    elements.renderProgressBar.style.width = `${percent}%`;
+    const trackWidth = bar.parentElement.getBoundingClientRect().width;
+    const shown = fresh || !trackWidth ? 0 : (bar.getBoundingClientRect().width / trackWidth) * 100;
+    const from = done ? percent : Math.max(percent, shown);
+    // Pin the bar where it is drawn (stopping any slow drift in progress), then move to this step.
+    bar.style.transition = 'none';
+    bar.style.width = `${shown}%`;
+    void bar.offsetWidth;
+    bar.style.transition = '';
+    bar.style.width = `${from}%`;
+    if (!done && creepTo !== undefined && percentAt(creepTo) > from) {
+        // Once the bar has reached this step's start, drift slowly towards its end.
+        progressCreepTimer = window.setTimeout(() => {
+            bar.style.transition = `width ${creepSeconds}s cubic-bezier(.1, .6, .3, 1)`;
+            bar.style.width = `${percentAt(creepTo)}%`;
+        }, 200);
+    }
     if (done) {
         elements.renderProgress.classList.add('progress-panel--done');
         progressHideTimer = window.setTimeout(() => elements.renderProgress.classList.add('hidden'), 900);

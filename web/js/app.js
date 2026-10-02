@@ -91,7 +91,7 @@ async function processFiles(fileList, { insertAt = null } = {}) {
             elements.addFilesBtn.disabled = busy;
             elements.dropZone.dataset.state = busy ? 'loading' : 'idle';
         },
-        onProgress: (current, total, label) => showPreviewProgress(current, total, label),
+        onProgress: (current, total, label, step) => showPreviewProgress(current, total, label, step),
         onError: message => showToast(message, { tone: 'error' }),
     }, { insertAt: insertAt ?? undefined });
     elements.fileInput.value = '';

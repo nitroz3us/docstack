@@ -58,7 +58,8 @@ export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
     try {
         for (let index = 0; index < files.length; index++) {
             const file = files[index];
-            callbacks.onProgress?.(index, files.length, `Opening ${file.name}`);
+            // Office files have several slow steps ahead, so their bar starts near the beginning.
+            callbacks.onProgress?.(index, files.length, `Opening ${file.name}`, looksLikeOfficeFile(file) ? { fraction: 0.02 } : undefined);
 
             try {
                 let arrayBuffer;
@@ -67,15 +68,22 @@ export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
                 } else if (looksLikeImage(file)) {
                     arrayBuffer = await imageToPdf(file);
                 } else if (looksLikeOfficeFile(file)) {
-                    // The engine itself downloads first with no progress events; the percentage covers its data file.
-                    callbacks.onProgress?.(index, files.length, 'Loading the conversion tool (about 50 MB the first time)');
-                    const stageLabels = {
-                        download: ({ loaded, total }) => `Loading the conversion tool (about 50 MB the first time) · ${Math.round((loaded / total) * 100)}%`,
-                        start: () => 'Starting the conversion tool, this takes a few seconds',
-                        convert: () => `Converting ${file.name}`,
+                    // Each stage owns a slice of the bar. Only the data download reports real progress;
+                    // the others creep towards the end of their slice so the bar never stands still.
+                    // The engine itself downloads first with no progress events.
+                    const stages = {
+                        download: ({ loaded, total }) => [
+                            `Loading the conversion tool (about 50 MB the first time) · ${Math.round((loaded / total) * 100)}%`,
+                            { fraction: 0.3 + 0.3 * (loaded / total) },
+                        ],
+                        start: () => ['Starting the conversion tool, this takes a few seconds', { fraction: 0.6, creepTo: 0.85, creepSeconds: 10 }],
+                        convert: () => [`Converting ${file.name}`, { fraction: 0.85, creepTo: 0.97, creepSeconds: 10 }],
                     };
+                    callbacks.onProgress?.(index, files.length, 'Loading the conversion tool (about 50 MB the first time)', {
+                        fraction: 0.02, creepTo: 0.3, creepSeconds: 25,
+                    });
                     arrayBuffer = await officeToPdf(file, {
-                        onStatus: status => callbacks.onProgress?.(index, files.length, stageLabels[status.stage](status)),
+                        onStatus: status => callbacks.onProgress?.(index, files.length, ...stages[status.stage](status)),
                     });
                 } else {
                     callbacks.onError?.(`${file.name} does not contain valid PDF data.`);
