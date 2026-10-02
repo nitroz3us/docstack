@@ -10,6 +10,7 @@
 
 **Arrange pages**
 - Drop in several PDFs and see every page at once, grouped by the file it came from.
+- Add PowerPoint and Word files (and their OpenDocument equivalents): they are converted to PDF on your device, with selectable text, and their slides or pages join the rest. Spreadsheets are not converted, because a sheet rarely fits a page well; export those as PDF from Excel first.
 - Add images (JPG, PNG, WebP, GIF, BMP, AVIF) too: each becomes a page you can arrange, rotate and redact like any other. Photos keep their full resolution and are turned upright if the camera saved them sideways.
 - Drag pages to reorder them, including several selected pages at once and between files.
 - Select like a file manager: click, <kbd>⌘</kbd>/<kbd>Ctrl</kbd>‑click, <kbd>Shift</kbd>‑click, or drag a box around pages.
@@ -30,9 +31,9 @@
 
 ## Privacy
 
-- **No uploads.** PDFs and images are opened, rendered and merged in your browser with [PDF.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/). No file or page is ever sent to a server.
-- **No third-party requests.** All libraries are served from this repository, and the interface uses your system's fonts. There are no analytics or trackers.
-- **Works offline.** Everything docstack needs is loaded when the page opens. After that you can turn off Wi‑Fi and keep working.
+- **No uploads.** PDFs, images, PowerPoint and Word files are opened, converted, rendered and merged in your browser with [PDF.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/). No file or page is ever sent to a server.
+- **One third-party request, only if you add a PowerPoint or Word file.** Everything else is served from this repository, and the interface uses your system's fonts. There are no analytics or trackers. The exception: the first time you add one, your browser downloads the converter (about 50 MB) from ZetaOffice's CDN, because it is too large to ship here. Your file is still converted on your device and is not sent anywhere.
+- **Works offline.** Everything docstack needs for PDFs and images is loaded when the page opens. After that you can turn off Wi‑Fi and keep working. Converting PowerPoint and Word files needs a connection.
 
 ![The full-window preview with a thumbnail strip, redacting an account number on an invoice](docs/screenshot-preview.png)
 
@@ -81,6 +82,8 @@ python3 -m http.server 3000
 
 Use `npm run watch:css` while editing styles or markup.
 
+Office conversion needs a cross-origin isolated page, so it only works when the server sends `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (set for the deployed site in `vercel.json`). `python3 -m http.server` does not send them; without them docstack still works and asks for Office files to be exported as PDF first.
+
 ### Project layout
 
 ```
@@ -91,9 +94,10 @@ web/
     state.js            the document: pages, order, rotation, redactions, undo history
     app.js              wiring, shortcuts, file loading and downloads
     handlers/           opening files, merging, blank pages
-    utils/              PDF.js loading, image-to-PDF conversion, helpers
+    office/             the script that runs inside the Office converter's worker
+    utils/              PDF.js loading, image and Office conversion, helpers
     ui/                 page grid, preview and dialogs, menus, toasts
-  lib/                  PDF.js, pdf-lib and SortableJS, served locally
+  lib/                  PDF.js, pdf-lib, SortableJS and zetajs, served locally
   assets/               favicon, touch icon and link-preview image
 design/                 sources for the link-preview image, icon and README screenshots
 docs/                   README screenshots
@@ -110,6 +114,7 @@ test/                   tests
 
 - [PDF.js](https://mozilla.github.io/pdf.js/) for rendering pages
 - [pdf-lib](https://pdf-lib.js.org/) for building the merged PDF
+- [ZetaOffice](https://zetaoffice.net/) (LibreOffice as WebAssembly) and [zetajs](https://github.com/allotropia/zetajs) for converting PowerPoint and Word files, loaded from ZetaOffice's CDN only when needed
 - [SortableJS](https://sortablejs.github.io/Sortable/) for drag and drop
 - [Tailwind CSS](https://tailwindcss.com/) at build time; the compiled stylesheet ships with the site
 

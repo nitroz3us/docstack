@@ -2,13 +2,15 @@ import * as state from '../state.js';
 import { generateId } from '../utils/helpers.js';
 import { getPageCount, hasPdfSignature, loadPdfDocument } from '../utils/pdf.js';
 import { imageToPdf, looksLikeImage } from '../utils/image.js';
+import { canConvertOfficeFiles, looksLikeOfficeFile, officeToPdf } from '../utils/office.js';
 import { showPasswordModal } from '../ui/modals.js';
 
 function looksLikePdf(file) {
     return file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
 }
 
-// Office files can't be converted on this device, but the app that made them can export a PDF.
+// For files that can't be converted here (spreadsheets, Keynote and Pages, or any Office file
+// when the converter is unavailable): the app that made them can export a PDF.
 const EXPORT_HINTS = [
     [/\.(pptx?|key|odp)$/i, 'PowerPoint, Keynote or Google Slides'],
     [/\.(docx?|pages|odt|rtf)$/i, 'Word, Pages or Google Docs'],
@@ -26,7 +28,7 @@ function describeIgnored(ignoredFiles) {
         return `${file.name} can't be opened here. Export it as a PDF from ${exportHint(file)}, then add the PDF.`;
     }
     const count = ignoredFiles.length;
-    const summary = `${count} unsupported file${count === 1 ? ' was' : 's were'} ignored. Add PDFs or images.`;
+    const summary = `${count} unsupported file${count === 1 ? ' was' : 's were'} ignored. Add PDFs, images, PowerPoint or Word files.`;
     return hinted.length > 0
         ? `${summary} Export Office documents as PDF from the app that made them first.`
         : summary;
@@ -40,7 +42,8 @@ function describeIgnored(ignoredFiles) {
  */
 export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
     const candidates = Array.from(fileList);
-    const isSupported = file => looksLikePdf(file) || looksLikeImage(file);
+    const isSupported = file => looksLikePdf(file) || looksLikeImage(file)
+        || (looksLikeOfficeFile(file) && canConvertOfficeFiles());
     const files = candidates.filter(isSupported);
     const ignoredFiles = candidates.filter(file => !isSupported(file));
     const ignored = ignoredFiles.length;
@@ -63,6 +66,15 @@ export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
                     arrayBuffer = await file.arrayBuffer();
                 } else if (looksLikeImage(file)) {
                     arrayBuffer = await imageToPdf(file);
+                } else if (looksLikeOfficeFile(file)) {
+                    callbacks.onProgress?.(index, files.length, `Converting ${file.name}`);
+                    arrayBuffer = await officeToPdf(file, {
+                        onStatus: ({ loaded, total }) => callbacks.onProgress?.(
+                            index,
+                            files.length,
+                            `Loading the converter (about 50 MB the first time) · ${Math.round((loaded / total) * 100)}%`
+                        ),
+                    });
                 } else {
                     callbacks.onError?.(`${file.name} does not contain valid PDF data.`);
                     continue;
