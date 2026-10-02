@@ -5,11 +5,20 @@ let pdfJsPromise = null;
 export async function ensurePdfJs() {
     if (!pdfJsPromise) {
         pdfJsPromise = import('../../lib/pdf.min.mjs').then(pdfjs => {
-            const workerUrl = new URL('../../lib/pdf.worker.min.mjs', import.meta.url);
+            // The page is cross-origin isolated, so the browser blocks a worker script that was
+            // served without the isolation headers. Copies cached before those headers existed
+            // stay that way ("304 Not Modified" does not add them), so the query string gives the
+            // worker a new address and forces a fresh download. Bump it if the headers change.
+            const workerUrl = new URL('../../lib/pdf.worker.min.mjs?v=2', import.meta.url);
             pdfjs.GlobalWorkerOptions.workerSrc = workerUrl.href;
             // Start one shared worker now, so its code is already loaded if the connection drops later.
             try {
-                pdfjs.GlobalWorkerOptions.workerPort = new Worker(workerUrl, { type: 'module' });
+                const worker = new Worker(workerUrl, { type: 'module' });
+                // A worker that failed to load never answers; let pdf.js start its own instead.
+                worker.addEventListener('error', () => {
+                    if (pdfjs.GlobalWorkerOptions.workerPort === worker) pdfjs.GlobalWorkerOptions.workerPort = null;
+                });
+                pdfjs.GlobalWorkerOptions.workerPort = worker;
             } catch {
                 // Fall back to pdf.js starting its own worker from workerSrc when a document opens.
             }
