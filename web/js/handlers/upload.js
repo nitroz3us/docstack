@@ -68,19 +68,18 @@ export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
                 } else if (looksLikeImage(file)) {
                     arrayBuffer = await imageToPdf(file);
                 } else if (looksLikeOfficeFile(file)) {
-                    // Each stage owns a slice of the bar. Only the data download reports real progress;
-                    // the others creep towards the end of their slice so the bar never stands still.
-                    // The engine itself downloads first with no progress events.
+                    // Each stage owns a slice of the bar. The download reports real progress; the
+                    // others creep towards the end of their slice so the bar never stands still.
                     const stages = {
-                        download: ({ loaded, total }) => [
-                            `Loading the conversion tool (about 50 MB the first time) · ${Math.round((loaded / total) * 100)}%`,
-                            { fraction: 0.3 + 0.3 * (loaded / total) },
+                        download: ({ fraction }) => [
+                            `Loading the conversion tool (about 50 MB the first time) · ${Math.round(fraction * 100)}%`,
+                            { fraction: 0.02 + 0.58 * fraction },
                         ],
                         start: () => ['Starting the conversion tool, this takes a few seconds', { fraction: 0.6, creepTo: 0.85, creepSeconds: 10 }],
                         convert: () => [`Converting ${file.name}`, { fraction: 0.85, creepTo: 0.97, creepSeconds: 10 }],
                     };
                     callbacks.onProgress?.(index, files.length, 'Loading the conversion tool (about 50 MB the first time)', {
-                        fraction: 0.02, creepTo: 0.3, creepSeconds: 25,
+                        fraction: 0.02,
                     });
                     arrayBuffer = await officeToPdf(file, {
                         onStatus: status => callbacks.onProgress?.(index, files.length, ...stages[status.stage](status)),

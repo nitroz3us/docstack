@@ -10,12 +10,16 @@
 
 // The one third-party request docstack makes: the engine is too large to ship in this repository.
 const ENGINE_URL = 'https://cdn.zetaoffice.net/zetaoffice_latest/';
-// How long each step of starting the engine may go without progress before giving up. The engine
-// file (about 36 MB) reports no progress while it downloads, so it gets the longest allowance;
-// starting up normally takes a few seconds.
-const ENGINE_DOWNLOAD_TIMEOUT_MS = 120000;
-const DATA_STALL_TIMEOUT_MS = 45000;
-const ENGINE_START_TIMEOUT_MS = 45000;
+// A slow connection is never cut off: while the engine's two files download, the only limit is
+// on how long nothing at all arrives. Compiling and starting the engine report no progress, so
+// those get a fixed allowance; starting normally takes a few seconds.
+const DOWNLOAD_STALL_TIMEOUT_MS = 45000;
+// For the progress display only: the engine file's size once decompressed, which the browser does
+// not report in advance, and its share of the whole download (the data file is the rest). If a new
+// engine build changes the size, the percentage is slightly off but still ends where it should.
+const ENGINE_FILE_BYTES = 162e6;
+const ENGINE_FILE_SHARE = 0.7;
+const ENGINE_START_TIMEOUT_MS = 90000;
 const CONVERT_TIMEOUT_MS = 180000;
 // A half-started or stuck engine cannot be restarted inside the same page.
 const RELOAD_HINT = 'Reload the page and try again.';
@@ -71,14 +75,28 @@ async function startOffice(onStatus) {
     const { ZetaHelperMain } = await import('../../lib/zetajs/zetaHelper.js');
     return new Promise((resolve, reject) => {
         let watchdog = 0;
+        // The engine downloads its data file itself and, if that fails, only throws from an event
+        // handler. Its script is cross-origin, so the browser reports such errors without a file
+        // name; docstack's own scripts always have one.
+        const onEngineError = event => {
+            if (!event.filename || event.filename.startsWith(ENGINE_URL)) fail('The conversion tool could not be downloaded.');
+        };
+        window.addEventListener('error', onEngineError);
+        const fail = message => {
+            window.clearTimeout(watchdog);
+            window.removeEventListener('error', onEngineError);
+            engineFailed = true;
+            const error = new Error(`${message} ${RELOAD_HINT}`);
+            reject(error);
+            // If the engine dies later, files being converted must not wait for their own limit.
+            pending.forEach(request => request.reject(error));
+            pending.clear();
+        };
         const allow = milliseconds => {
             window.clearTimeout(watchdog);
-            watchdog = window.setTimeout(() => {
-                engineFailed = true;
-                reject(new Error(`The conversion tool did not start. ${RELOAD_HINT}`));
-            }, milliseconds);
+            watchdog = window.setTimeout(() => fail('The conversion tool did not start.'), milliseconds);
         };
-        allow(ENGINE_DOWNLOAD_TIMEOUT_MS);
+        allow(DOWNLOAD_STALL_TIMEOUT_MS);
         // The engine expects a canvas for its (unused) interface.
         if (!document.getElementById('qtcanvas')) {
             const canvas = document.createElement('canvas');
@@ -86,10 +104,54 @@ async function startOffice(onStatus) {
             canvas.hidden = true;
             document.body.appendChild(canvas);
         }
+        // Report whole percents only; the engine file arrives in thousands of small chunks.
+        let reportedPercent = -1;
+        const reportDownload = fraction => {
+            const percent = Math.floor(Math.min(fraction, 1) * 100);
+            if (percent === reportedPercent) return;
+            reportedPercent = percent;
+            onStatus?.({ stage: 'download', fraction: percent / 100 });
+        };
         const helper = new ZetaHelperMain(new URL('../office/thread.js', import.meta.url).href, {
             threadJsType: 'module',
             wasmPkg: `url:${ENGINE_URL}`,
         });
+        // The engine calls this if it crashes.
+        helper.Module.onAbort = () => fail('The conversion tool stopped working.');
+        // Download the engine file here instead of letting the engine fetch it: its own fetch
+        // reports neither progress nor failure, so a slow download could not be told apart from a
+        // dead one. Counting the bytes as they stream into the compiler keeps the stall limit
+        // honest, and a failed download is reported at once.
+        helper.Module.instantiateWasm = (imports, receiveInstance) => {
+            (async () => {
+                const response = await fetch(`${ENGINE_URL}soffice.wasm`);
+                if (!response.ok || !response.body) throw new Error(`Unexpected response (${response.status})`);
+                const reader = response.body.getReader();
+                let received = 0;
+                const counted = new ReadableStream({
+                    async pull(controller) {
+                        const { done, value } = await reader.read();
+                        if (done) {
+                            // Downloaded; what remains is compiling, then the data file.
+                            allow(ENGINE_START_TIMEOUT_MS);
+                            controller.close();
+                            return;
+                        }
+                        allow(DOWNLOAD_STALL_TIMEOUT_MS);
+                        received += value.byteLength;
+                        reportDownload(ENGINE_FILE_SHARE * Math.min(received / ENGINE_FILE_BYTES, 1));
+                        controller.enqueue(value);
+                    },
+                    cancel: reason => reader.cancel(reason),
+                });
+                const { instance, module } = await WebAssembly.instantiateStreaming(
+                    new Response(counted, { headers: { 'Content-Type': 'application/wasm' } }),
+                    imports
+                );
+                receiveInstance(instance, module);
+            })().catch(() => fail('The conversion tool could not be downloaded.'));
+            return {};
+        };
         // Emscripten reports download progress as "Downloading data... (12345/67890)". Once the
         // download is complete the engine still takes a few seconds to start, so say so instead of
         // sitting at 100%.
@@ -100,13 +162,15 @@ async function startOffice(onStatus) {
             const loaded = Number(match[1]);
             const total = Number(match[2]);
             starting = loaded >= total;
-            allow(starting ? ENGINE_START_TIMEOUT_MS : DATA_STALL_TIMEOUT_MS);
-            onStatus?.(starting ? { stage: 'start' } : { stage: 'download', loaded, total });
+            allow(starting ? ENGINE_START_TIMEOUT_MS : DOWNLOAD_STALL_TIMEOUT_MS);
+            if (starting) onStatus?.({ stage: 'start' });
+            else reportDownload(ENGINE_FILE_SHARE + (1 - ENGINE_FILE_SHARE) * (loaded / total));
         };
         helper.start(() => {
             helper.thrPort.onmessage = ({ data }) => {
                 if (data.cmd === 'ready') {
                     window.clearTimeout(watchdog);
+                    window.removeEventListener('error', onEngineError);
                     resolve(helper);
                     return;
                 }
@@ -172,8 +236,8 @@ async function convert(file, { onStatus } = {}) {
 
 /**
  * @param {File} file
- * @param {{onStatus?: (status: {stage: 'download'|'start'|'convert', loaded?: number, total?: number}) => void}} [options]
- *   called as the work moves on: downloading the engine (first time only, with byte counts),
+ * @param {{onStatus?: (status: {stage: 'download'|'start'|'convert', fraction?: number}) => void}} [options]
+ *   called as the work moves on: downloading the engine (with how much of it has arrived, 0 to 1),
  *   starting it, then converting the file.
  * @returns {Promise<ArrayBuffer>} the file as a PDF.
  */
