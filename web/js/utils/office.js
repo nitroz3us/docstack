@@ -74,10 +74,17 @@ async function startOffice(onStatus) {
             threadJsType: 'module',
             wasmPkg: `url:${ENGINE_URL}`,
         });
-        // Emscripten reports download progress as "Downloading data... (12345/67890)".
+        // Emscripten reports download progress as "Downloading data... (12345/67890)". Once the
+        // download is complete the engine still takes a few seconds to start, so say so instead of
+        // sitting at 100%.
+        let starting = false;
         helper.Module.setStatus = text => {
             const match = /\((\d+)\/(\d+)\)/.exec(text || '');
-            if (match) onStatus?.({ loaded: Number(match[1]), total: Number(match[2]) });
+            if (!match || starting) return;
+            const loaded = Number(match[1]);
+            const total = Number(match[2]);
+            starting = loaded >= total;
+            onStatus?.(starting ? { stage: 'start' } : { stage: 'download', loaded, total });
         };
         helper.start(() => {
             helper.thrPort.onmessage = ({ data }) => {
@@ -110,6 +117,7 @@ async function convert(file, { onStatus } = {}) {
         throw new Error(`It is not a valid ${kind?.name || 'Office'} file, or it is password-protected.`);
     }
     const helper = await ensureOffice(onStatus);
+    onStatus?.({ stage: 'convert' });
 
     const id = ++nextId;
     const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
@@ -144,8 +152,9 @@ async function convert(file, { onStatus } = {}) {
 
 /**
  * @param {File} file
- * @param {{onStatus?: (progress: {loaded: number, total: number}) => void}} [options] - loading
- *   progress of the engine, the first time it is needed.
+ * @param {{onStatus?: (status: {stage: 'download'|'start'|'convert', loaded?: number, total?: number}) => void}} [options]
+ *   called as the work moves on: downloading the engine (first time only, with byte counts),
+ *   starting it, then converting the file.
  * @returns {Promise<ArrayBuffer>} the file as a PDF.
  */
 export function officeToPdf(file, options) {

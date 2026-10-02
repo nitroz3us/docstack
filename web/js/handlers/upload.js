@@ -67,13 +67,15 @@ export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
                 } else if (looksLikeImage(file)) {
                     arrayBuffer = await imageToPdf(file);
                 } else if (looksLikeOfficeFile(file)) {
-                    callbacks.onProgress?.(index, files.length, `Converting ${file.name}`);
+                    // The engine itself downloads first with no progress events; the percentage covers its data file.
+                    callbacks.onProgress?.(index, files.length, 'Loading the conversion tool (about 50 MB the first time)');
+                    const stageLabels = {
+                        download: ({ loaded, total }) => `Loading the conversion tool (about 50 MB the first time) · ${Math.round((loaded / total) * 100)}%`,
+                        start: () => 'Starting the conversion tool, this takes a few seconds',
+                        convert: () => `Converting ${file.name}`,
+                    };
                     arrayBuffer = await officeToPdf(file, {
-                        onStatus: ({ loaded, total }) => callbacks.onProgress?.(
-                            index,
-                            files.length,
-                            `Loading the conversion tool (about 50 MB the first time) · ${Math.round((loaded / total) * 100)}%`
-                        ),
+                        onStatus: status => callbacks.onProgress?.(index, files.length, stageLabels[status.stage](status)),
                     });
                 } else {
                     callbacks.onError?.(`${file.name} does not contain valid PDF data.`);
