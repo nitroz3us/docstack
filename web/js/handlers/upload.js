@@ -125,7 +125,7 @@ export async function handleFiles(fileList, callbacks = {}, { insertAt } = {}) {
             }
         }
     } finally {
-        callbacks.onProgress?.(files.length, files.length, 'Documents ready');
+        callbacks.onProgress?.(files.length, files.length, 'Documents ready', { added });
         callbacks.onBusy?.(false);
     }
 

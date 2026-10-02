@@ -328,12 +328,20 @@ let progressCreepTimer = 0;
  * @param {number} current - index of the file being opened
  * @param {number} total - number of files
  * @param {string} [label]
- * @param {{fraction?: number, creepTo?: number, creepSeconds?: number}} [step] - how far through
- *   the current file the work is (0 to 1). For a step of unknown length, `creepTo` keeps the bar
- *   moving slowly towards that fraction over `creepSeconds` instead of standing still.
+ * @param {{fraction?: number, creepTo?: number, creepSeconds?: number, added?: number}} [step] - how
+ *   far through the current file the work is (0 to 1). For a step of unknown length, `creepTo`
+ *   keeps the bar moving slowly towards that fraction over `creepSeconds` instead of standing
+ *   still. With the final call, `added` is how many of the files actually opened.
  */
-export function showPreviewProgress(current, total, label = 'Opening documents', { fraction = 0.5, creepTo, creepSeconds = 8 } = {}) {
+export function showPreviewProgress(current, total, label = 'Opening documents', { fraction = 0.5, creepTo, creepSeconds = 8, added = total } = {}) {
     const done = current >= total;
+    if (done && added === 0) {
+        // Nothing opened, and an error message says why; don't end on a green "ready".
+        window.clearTimeout(progressHideTimer);
+        window.clearTimeout(progressCreepTimer);
+        elements.renderProgress.classList.add('hidden');
+        return;
+    }
     const percentAt = part => (total > 0 ? Math.round((Math.min(current + (done ? 0 : part), total) / total) * 1000) / 10 : 0);
     const percent = percentAt(fraction);
     const bar = elements.renderProgressBar;
@@ -345,7 +353,7 @@ export function showPreviewProgress(current, total, label = 'Opening documents',
     elements.renderProgress.classList.remove('hidden', 'progress-panel--done');
     elements.renderProgress.setAttribute('aria-valuenow', String(Math.round(percent)));
     elements.renderProgressText.textContent = done
-        ? `${total === 1 ? 'Document' : `${total} documents`} ready`
+        ? (added < total ? `${added} of ${total} documents ready` : `${total === 1 ? 'Document' : `${total} documents`} ready`)
         : `${label}${total > 1 ? ` · ${current + 1} of ${total}` : ''}`;
     const trackWidth = bar.parentElement.getBoundingClientRect().width;
     const shown = fresh || !trackWidth ? 0 : (bar.getBoundingClientRect().width / trackWidth) * 100;
