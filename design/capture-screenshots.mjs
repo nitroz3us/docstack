@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Captures the README screenshots (docs/screenshot-workspace.png, docs/screenshot-preview.png)
- * from the real app, using made-up sample PDFs and a sample photo.
+ * from the real app, using made-up sample PDFs, a Word document, a photo and a slide deck.
  *
  *   node design/capture-screenshots.mjs
  *
@@ -115,10 +115,23 @@ const LOAD_SAMPLES = String(async function loadSamples() {
         (d, r, b) => { const p = portrait(d); p.drawText('Invoice', { x: 56, y: 716, size: 28, font: b, color: ink }); p.drawText('#2291', { x: 490, y: 720, size: 14, font: r, color: muted }); p.drawLine({ start: { x: 56, y: 700 }, end: { x: 556, y: 700 }, thickness: 1.5, color: ink }); [['Linehaul, September', '14,200.00'], ['Fuel surcharge', '2,640.00'], ['Detention', '980.00'], ['Handling', '600.00']].forEach(([label, value], i) => { const y = 600 - i * 28; p.drawText(label, { x: 56, y, size: 11, font: r, color: ink }); p.drawText(value, { x: 490, y, size: 11, font: r, color: ink }); }); p.drawText('Total due   $18,420.00', { x: 380, y: 470, size: 14, font: b, color: ink }); p.drawText('Pay to account', { x: 56, y: 110, size: 9, font: r, color: muted }); p.drawText('NL91 ABNA 0417 1643 00', { x: 56, y: 92, size: 13, font: r, color: ink }); },
         (d, r, b) => { const p = portrait(d); p.drawText('Payment terms', { x: 56, y: 720, size: 20, font: b, color: ink }); paragraph(p, r, 'Payment is due within 30 days of the invoice date. Late payments accrue interest at the statutory rate. Please quote the invoice number with every payment so it can be matched to your account.', 56, 690, 500); },
     ]);
-    const nda = await build('Signed-NDA.pdf', [
+    // A Word document. Like the slide deck below, it is built as a PDF and only named .docx (the
+    // app opens files by their contents), so capturing screenshots does not have to download the
+    // 50 MB conversion tool. A converted document looks the same in the app.
+    const nda = await build('NDA-draft.docx', [
         (d, r, b) => { const p = portrait(d); p.drawText('Mutual Non-Disclosure Agreement', { x: 56, y: 720, size: 20, font: b, color: ink }); let y = 680; ['1. Definitions', '2. Obligations', '3. Exclusions'].forEach(title => { p.drawText(title, { x: 56, y, size: 12, font: b, color: ink }); y = paragraph(p, r, 'Each party agrees to keep the other party’s confidential information secret, to use it only for evaluating the proposed partnership, and to share it only with staff who need to know it for that purpose.', 56, y - 20, 500) - 18; }); },
         (d, r, b) => { const p = portrait(d); let y = 720; ['4. Term', '5. Return of materials', '6. Governing law'].forEach(title => { p.drawText(title, { x: 56, y, size: 12, font: b, color: ink }); y = paragraph(p, r, 'These obligations continue for three years after the last disclosure. On request, each party will return or destroy the other party’s materials and confirm this in writing.', 56, y - 20, 500) - 18; }); },
         (d, r, b) => { const p = portrait(d); p.drawText('Signatures', { x: 56, y: 720, size: 20, font: b, color: ink }); [56, 330].forEach((x, i) => { p.drawLine({ start: { x, y: 560 }, end: { x: x + 220, y: 560 }, thickness: 1, color: ink }); p.drawText(i ? 'Harbor Logistics · 2 Sep 2026' : 'Northwind Freight · 2 Sep 2026', { x, y: 542, size: 10, font: r, color: muted }); }); },
+    ]);
+
+    // A slide deck, to show PowerPoint files going in alongside PDFs (also a PDF named .pptx).
+    const slide = document => document.addPage([960, 540]);
+    const navy = rgb(0.09, 0.19, 0.31);
+    const gold = rgb(0.85, 0.64, 0.25);
+    const deck = await build('Fleet-plan.pptx', [
+        (d, r, b) => { const p = slide(d); p.drawRectangle({ x: 0, y: 0, width: 960, height: 540, color: navy }); p.drawRectangle({ x: 70, y: 250, width: 90, height: 6, color: gold }); p.drawText('Fleet expansion plan', { x: 70, y: 280, size: 48, font: b, color: rgb(0.96, 0.97, 0.98) }); p.drawText('Board session · Item 4 · October 2026', { x: 70, y: 205, size: 20, font: r, color: rgb(0.72, 0.78, 0.85) }); },
+        (d, r, b) => { const p = slide(d); p.drawText('Why now', { x: 70, y: 440, size: 36, font: b, color: ink }); p.drawRectangle({ x: 70, y: 420, width: 820, height: 4, color: gold }); ['Two national retail contracts start in Q1', 'Northern corridor is running at 96% capacity', 'Lease rates are fixed until March'].forEach((line, i) => { p.drawCircle({ x: 82, y: 357 - i * 62, size: 5, color: navy }); p.drawText(line, { x: 104, y: 348 - i * 62, size: 24, font: r, color: ink }); }); },
+        (d, r, b) => { const p = slide(d); p.drawText('The numbers', { x: 70, y: 440, size: 36, font: b, color: ink }); p.drawRectangle({ x: 70, y: 420, width: 820, height: 4, color: gold }); [['+24', 'trucks by Q2 2027'], ['$3.1m', 'capital cost'], ['18 mo', 'payback period']].forEach(([big, small], i) => { p.drawRectangle({ x: 70 + i * 280, y: 150, width: 260, height: 190, color: navy }); p.drawText(big, { x: 96 + i * 280, y: 250, size: 44, font: b, color: rgb(0.96, 0.97, 0.98) }); p.drawText(small, { x: 96 + i * 280, y: 200, size: 18, font: r, color: rgb(0.72, 0.78, 0.85) }); }); },
     ]);
 
     // A phone photo of a fuel receipt, to show images going in alongside PDFs.
@@ -169,10 +182,10 @@ const LOAD_SAMPLES = String(async function loadSamples() {
 
     const input = document.getElementById('fileInput');
     const transfer = new DataTransfer();
-    [report, invoice, nda, await receiptPhoto()].forEach(file => transfer.items.add(file));
+    [report, invoice, nda, await receiptPhoto(), deck].forEach(file => transfer.items.add(file));
     input.files = transfer.files;
     input.dispatchEvent(new Event('change'));
-    const expected = 11;
+    const expected = 14;
     while (document.querySelectorAll('.page-canvas[data-rendered="true"]').length < expected) await new Promise(done => setTimeout(done, 100));
     return document.querySelectorAll('.page-tile').length;
 });
