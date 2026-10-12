@@ -3,6 +3,7 @@
     "outputDirectory": "web",
     "framework": null,
     "cleanUrls": true,
+    "trailingSlash": false,
     "regions": [
         "sin1"
     ],
