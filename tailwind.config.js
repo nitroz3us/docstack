@@ -2,7 +2,7 @@
 export default {
     blocklist: ['!button'],
     content: [
-        './web/index.html',
+        './web/*.html',
         './web/js/**/*.js',
     ],
     theme: {

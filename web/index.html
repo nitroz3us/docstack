@@ -146,7 +146,7 @@
             </section>
         </section>
 
-        <!-- Below the first screen of the home page: what docstack does, in words. Hidden once there are pages. -->
+        <!-- Below the first screen: what docstack does, in words. Hidden once there are pages. -->
         <section id="about" class="about" aria-labelledby="aboutTitle">
             <div class="about__inner">
                 <h2 id="aboutTitle">Combine PDFs without uploading them</h2>
@@ -167,17 +167,19 @@
                 </ol>
 
                 <h2>What you can add</h2>
-                <dl class="about__formats">
+                <dl class="about__facts">
                     <div><dt>PDFs</dt><dd>Including password-protected PDFs, which open once you enter the password.</dd></div>
                     <div><dt>Images</dt><dd>JPG, PNG, WebP, GIF, BMP and AVIF. Each image becomes a page, and photos keep their full resolution.</dd></div>
                     <div><dt>PowerPoint</dt><dd>.pptx, .ppt and .odp files, converted to PDF on your device with selectable text.</dd></div>
                     <div><dt>Word</dt><dd>.docx, .doc, .odt and .rtf files, converted the same way.</dd></div>
                 </dl>
 
-                <h2>Your files stay on your device</h2>
-                <p>Many online PDF tools upload your files to a server to work on them. docstack does the work in this browser tab instead: files are opened, converted, arranged and merged on your device, and no file or page is sent anywhere. There are no analytics and no trackers.</p>
-                <p>You can check this yourself. Once the page has loaded, turn off Wi‑Fi and keep working: PDFs and images still open, rearrange and download.</p>
-                <p>There is one download to know about. The first time you add a PowerPoint or Word file, your browser fetches the tool that converts it (about 50 MB) from ZetaOffice. The file itself is still converted on your device.</p>
+                <div class="about__privacy">
+                    <h2>Your files stay on your device</h2>
+                    <p>Many online PDF tools upload your files to a server to work on them. docstack does the work in this browser tab instead: files are opened, converted, arranged and merged on your device, and no file or page is sent anywhere. There are no analytics and no trackers.</p>
+                    <p>You can check this yourself. Once the page has loaded, turn off Wi‑Fi and keep working: PDFs and images still open, rearrange and download.</p>
+                    <p>There is one download to know about. The first time you add a PowerPoint or Word file, your browser fetches the tool that converts it (about 50 MB) from ZetaOffice. The file itself is still converted on your device.</p>
+                </div>
 
                 <h2>Common questions</h2>
                 <div class="about__faq">
@@ -214,6 +216,17 @@
                         <p>Not directly. Export them as PDF from their own app first, then add the PDF. docstack shows you how when you drop one.</p>
                     </div>
                 </div>
+
+                <nav class="about__tasks" aria-label="What you can do with docstack">
+                    <ul>
+                        <li><a href="./" aria-current="page">Merge and arrange PDFs</a></li>
+                        <li><a href="merge-pdf">Merge PDF files</a></li>
+                        <li><a href="reorder-pdf-pages">Reorder PDF pages</a></li>
+                        <li><a href="redact-pdf">Redact a PDF</a></li>
+                        <li><a href="word-to-pdf">Convert Word to PDF</a></li>
+                        <li><a href="images-to-pdf">Turn images into a PDF</a></li>
+                    </ul>
+                </nav>
             </div>
         </section>
     </main>

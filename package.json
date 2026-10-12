@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run build:css",
+    "build": "npm run build:pages && npm run build:css",
+    "build:pages": "node scripts/build-pages.mjs",
     "build:css": "tailwindcss -i web/css/styles.input.css -o web/css/styles.css --minify",
     "watch:css": "tailwindcss -i web/css/styles.input.css -o web/css/styles.css --watch",
     "test": "node --test"
