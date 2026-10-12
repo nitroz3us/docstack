@@ -145,6 +145,77 @@
                 <p id="pageGridHelp" class="sr-only">Arrow keys move between pages. Shift with an arrow key extends the selection. Space or Enter opens a page. Alt with an arrow key moves the selected pages.</p>
             </section>
         </section>
+
+        <!-- Below the first screen of the home page: what docstack does, in words. Hidden once there are pages. -->
+        <section id="about" class="about" aria-labelledby="aboutTitle">
+            <div class="about__inner">
+                <h2 id="aboutTitle">Combine PDFs without uploading them</h2>
+                <p class="about__lede">docstack merges PDFs, images, PowerPoint and Word files into one PDF, and lets you put every page in order first. It runs in your browser, so the files you add stay on your device.</p>
+                <ol class="about__steps">
+                    <li>
+                        <h3>Add your files</h3>
+                        <p>Choose or drop as many files as you like. Every page appears at once, grouped by the file it came from.</p>
+                    </li>
+                    <li>
+                        <h3>Arrange the pages</h3>
+                        <p>Drag pages to reorder them, within a file or between files. Rotate or delete pages, insert a blank page, or redact what should not be shared.</p>
+                    </li>
+                    <li>
+                        <h3>Download one PDF</h3>
+                        <p>Name the file and download it. You can also extract only the pages you selected as a PDF of their own.</p>
+                    </li>
+                </ol>
+
+                <h2>What you can add</h2>
+                <dl class="about__formats">
+                    <div><dt>PDFs</dt><dd>Including password-protected PDFs, which open once you enter the password.</dd></div>
+                    <div><dt>Images</dt><dd>JPG, PNG, WebP, GIF, BMP and AVIF. Each image becomes a page, and photos keep their full resolution.</dd></div>
+                    <div><dt>PowerPoint</dt><dd>.pptx, .ppt and .odp files, converted to PDF on your device with selectable text.</dd></div>
+                    <div><dt>Word</dt><dd>.docx, .doc, .odt and .rtf files, converted the same way.</dd></div>
+                </dl>
+
+                <h2>Your files stay on your device</h2>
+                <p>Many online PDF tools upload your files to a server to work on them. docstack does the work in this browser tab instead: files are opened, converted, arranged and merged on your device, and no file or page is sent anywhere. There are no analytics and no trackers.</p>
+                <p>You can check this yourself. Once the page has loaded, turn off Wi‑Fi and keep working: PDFs and images still open, rearrange and download.</p>
+                <p>There is one download to know about. The first time you add a PowerPoint or Word file, your browser fetches the tool that converts it (about 50 MB) from ZetaOffice. The file itself is still converted on your device.</p>
+
+                <h2>Common questions</h2>
+                <div class="about__faq">
+                    <div>
+                        <h3>Are my files uploaded anywhere?</h3>
+                        <p>No. docstack reads, converts and merges your files inside this browser tab. Nothing you add is sent to a server.</p>
+                    </div>
+                    <div>
+                        <h3>Does it work offline?</h3>
+                        <p>For PDFs and images, yes. Everything they need loads with the page, so you can go offline afterwards and keep working. Converting PowerPoint and Word files needs a connection.</p>
+                    </div>
+                    <div>
+                        <h3>Is docstack free?</h3>
+                        <p>Yes. docstack is free to use, and its code is open source under the MIT License on <a href="https://github.com/nitroz3us/docstack" target="_blank" rel="noopener noreferrer">GitHub</a>.</p>
+                    </div>
+                    <div>
+                        <h3>Do I need to install anything?</h3>
+                        <p>No. docstack is a web page: open it and add your files. There is nothing to install and no account to create.</p>
+                    </div>
+                    <div>
+                        <h3>Is there a limit on file size or pages?</h3>
+                        <p>There is no set limit. Your files are held in your browser's memory, so how much it can handle depends on your device.</p>
+                    </div>
+                    <div>
+                        <h3>Is redaction permanent?</h3>
+                        <p>Yes. A page with redactions is downloaded as an image with the boxes drawn in, so what is underneath cannot be selected, copied or recovered. Other text on that page is no longer selectable or searchable either.</p>
+                    </div>
+                    <div>
+                        <h3>Can I merge password-protected PDFs?</h3>
+                        <p>Yes. Enter the password to open the file. Its pages are downloaded as images, so their text is not selectable, and docstack tells you before you download.</p>
+                    </div>
+                    <div>
+                        <h3>Can I add Excel, Keynote or Pages files?</h3>
+                        <p>Not directly. Export them as PDF from their own app first, then add the PDF. docstack shows you how when you drop one.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <div id="exportBar" class="export-bar hidden">

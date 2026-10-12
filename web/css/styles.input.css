@@ -151,6 +151,26 @@
 
     .workspace { max-width: 1440px; margin: 0 auto; padding: 8px 20px 48px; }
     body:not(.has-files) .workspace { padding-bottom: 20px; }
+    /* Below the first screen of the home page: what docstack does, in words, for people who scroll and for search engines. */
+    .about { max-width: 1440px; margin: 0 auto; padding: 0 20px 80px; }
+    body.has-files .about { display: none; }
+    .about__inner { max-width: 880px; margin: 0 auto; padding-top: 56px; border-top: 1px solid var(--border); }
+    .about h2 { margin: 60px 0 0; font-size: 21px; font-weight: 600; line-height: 1.25; letter-spacing: -.02em; text-wrap: balance; }
+    .about__inner > h2:first-child { margin-top: 0; }
+    .about h3 { margin: 0; color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.4; }
+    .about p, .about dd { max-width: 68ch; margin: 10px 0 0; color: var(--text-muted); font-size: 14.5px; line-height: 1.65; text-wrap: pretty; }
+    .about h3 + p { margin-top: 5px; }
+    .about a { color: var(--text); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+    .about a:hover { text-decoration-color: currentColor; }
+    .about__steps { counter-reset: step; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; margin: 30px 0 0; padding: 0; list-style: none; }
+    .about__steps li { counter-increment: step; }
+    .about__steps li::before { content: counter(step); width: 26px; height: 26px; display: grid; place-items: center; margin-bottom: 12px; border-radius: 999px; background: var(--surface-muted); color: var(--text-muted); font-size: 13px; font-weight: 600; }
+    .about__formats { margin: 18px 0 0; }
+    .about__formats div { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .about__formats dt { color: var(--text); font-size: 14.5px; font-weight: 600; line-height: 1.65; }
+    .about__formats dd { margin: 0; }
+    .about__faq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 30px 48px; margin-top: 26px; }
+
     .add-files-button { min-height: 34px; gap: 6px; border-radius: var(--radius-sm); padding: 0 12px; font-size: 13.5px; font-weight: 500; }
     .add-files-button svg { width: 16px; height: 16px; }
     .pages-panel { min-width: 0; }
@@ -454,6 +474,11 @@
     .drop-zone { --chrome-height: 99px; margin: 10px; padding: 36px 18px; }
     .workspace { padding: 4px 12px 32px; }
     body:not(.has-files) .workspace { padding-bottom: 12px; }
+    .about { padding: 0 16px 56px; }
+    .about__inner { padding-top: 40px; }
+    .about h2 { margin-top: 48px; font-size: 19px; }
+    .about__steps, .about__faq { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .about__formats div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
     .page-grid { --tile-gap: 10px; gap: 26px; padding: 10px 4px 20px; }
     .page-grid[data-density="compact"] { --tile-gap: 6px; gap: 22px; }
     .page-run { width: 100%; }
