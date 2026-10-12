@@ -169,8 +169,15 @@
     .about__facts div { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
     .about__facts dt { color: var(--text); font-size: 14.5px; font-weight: 600; line-height: 1.65; }
     .about__facts dd { margin: 0; }
+    /* Fixed layout: the label column is as wide as the labels in the lists above, and the two products share the rest. */
+    .about__compare { width: 100%; margin-top: 30px; table-layout: fixed; border-collapse: collapse; text-align: left; font-size: 14.5px; line-height: 1.65; }
+    .about__compare th, .about__compare td { padding: 12px 24px 12px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .about__compare th { color: var(--text); font-weight: 600; }
+    .about__compare thead td { width: 144px; }
+    .about__compare td { color: var(--text-muted); }
+    .about .about__note { margin-top: 12px; color: var(--text-subtle); font-size: 13px; }
     .about__faq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 30px 48px; margin-top: 26px; }
-    /* The same list on the home page and every task page; the page you are on is plain text. */
+    /* The same list on the home page and every landing page; the page you are on is plain text. */
     .about__tasks { margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border); }
     .about__tasks ul { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 0; padding: 0; list-style: none; font-size: 14px; }
     .about__tasks a[aria-current] { color: var(--text-muted); text-decoration: none; }
@@ -483,6 +490,11 @@
     .about h2 { margin-top: 48px; font-size: 19px; }
     .about__steps, .about__faq { grid-template-columns: minmax(0, 1fr); gap: 24px; }
     .about__facts div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .about__compare thead { display: none; }
+    .about__compare tr { display: block; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .about__compare th, .about__compare td { display: block; padding: 0; border: 0; }
+    .about__compare td { margin-top: 6px; }
+    .about__compare td::before { content: attr(data-label) ': '; color: var(--text); font-weight: 500; }
     .about__tasks { margin-top: 48px; }
     .about__tasks ul { flex-direction: column; gap: 12px; }
     .page-grid { --tile-gap: 10px; gap: 26px; padding: 10px 4px 20px; }

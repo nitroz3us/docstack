@@ -76,12 +76,12 @@ The first time you add a PowerPoint or Word file, docstack downloads the tool th
 
 ## Development
 
-docstack is a static site with no framework. The only build steps write the task pages and the stylesheet, and their output is committed.
+docstack is a static site with no framework. The only build steps write the landing pages and the stylesheet, and their output is committed.
 
 ```bash
 npm install          # Tailwind CSS, used only to build the stylesheet
-npm run build        # write the task pages and sitemap, then compile web/css/styles.input.css → web/css/styles.css
-npm test             # state, helper, file-type and task-page tests (Node's built-in test runner)
+npm run build        # write the landing pages and sitemap, then compile web/css/styles.input.css → web/css/styles.css
+npm test             # state, helper, file-type and landing-page tests (Node's built-in test runner)
 ```
 
 Serve the `web/` folder with any static server, for example:
@@ -96,9 +96,15 @@ Use `npm run watch:css` while editing styles or markup.
 
 PowerPoint and Word conversion needs a cross-origin isolated page, so it only works when the server sends `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (set for the deployed site in `vercel.json`). `python3 -m http.server` does not send them; without them docstack still works and asks for those files to be exported as PDF first.
 
-### Task pages
+### Landing pages
 
-`/merge-pdf`, `/reorder-pdf-pages`, `/redact-pdf`, `/word-to-pdf` and `/images-to-pdf` are the whole app with their own title, description, heading and text below the first screen, so a search for one job lands on a page about that job. They are generated from `web/index.html`; the words are in `scripts/task-pages.mjs`. After changing either, run `npm run build` and commit the result. `npm test` fails if the pages in `web/` are out of date.
+Each of these is the whole app with its own title, description, heading and text below the first screen, so a search lands on a page about exactly what was searched for:
+
+- one per task: `/merge-pdf`, `/reorder-pdf-pages`, `/redact-pdf`, `/word-to-pdf`, `/images-to-pdf`
+- `/offline-pdf-merger`, on using docstack without a connection
+- `/ilovepdf-alternative`, a comparison with iLovePDF. What it says about iLovePDF comes from that site's own pages and is dated, so check it again from time to time.
+
+They are generated from `web/index.html`; the words are in `scripts/pages.mjs`. After changing either, run `npm run build` and commit the result. `npm test` fails if the pages in `web/` are out of date.
 
 The pages link to each other without `.html`, which is how the deployed site serves them. With a plain static server, open `/merge-pdf.html` instead.
 
@@ -107,7 +113,7 @@ The pages link to each other without `.html`, which is how the deployed site ser
 ```
 web/
   index.html            page markup and metadata
-  merge-pdf.html, …     task pages, generated from index.html (do not edit)
+  merge-pdf.html, …     landing pages, generated from index.html (do not edit)
   robots.txt            lets search engines in and points them to the sitemap
   sitemap.xml           generated list of the pages
   css/                  styles (edit styles.input.css; styles.css is generated)
@@ -120,7 +126,7 @@ web/
     ui/                 page grid, preview and dialogs, menus, toasts
   lib/                  PDF.js, pdf-lib, SortableJS and zetajs, served locally
   assets/               favicon, touch icon and link-preview image
-scripts/                builds the task pages and sitemap; task-pages.mjs holds their text
+scripts/                builds the landing pages and sitemap; pages.mjs holds their text
 design/                 sources for the link-preview image, icon and README screenshots
 docs/                   README screenshots
 test/                   tests

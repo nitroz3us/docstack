@@ -1,10 +1,13 @@
 /**
- * The words for each task page. Everything here is plain text: build-pages.mjs escapes it.
+ * The words for each landing page. Everything here is plain text: build-pages.mjs escapes it.
  *
- * A task page is the whole app with its own title, description, heading and text below the first
- * screen, so someone searching for one job lands on a page about that job. Each page says things
- * the others do not; keep it that way, and keep every claim true of the app (the README and the
- * app's own dialogs are the reference).
+ * A landing page is the whole app with its own title, description, heading and text below the
+ * first screen, so someone searching for one job, or for a private or offline PDF tool, lands on a
+ * page about exactly that. Each page says things the others do not; keep it that way, and keep
+ * every claim true of the app (the README and the app's own dialogs are the reference).
+ *
+ * A page has `steps` (three numbered steps), a `comparison` (a table against another product), or
+ * both, then `facts` and `questions`.
  *
  * To add a page: add an entry here, link it from the list at the end of the about section in
  * web/index.html, then run `npm run build`.
@@ -12,7 +15,7 @@
 
 const NO_LIMIT = "There is no set limit. Your files are held in your browser's memory, so how much it can handle depends on your device.";
 
-export const TASK_PAGES = [
+export const PAGES = [
     {
         slug: 'merge-pdf',
         title: 'Merge PDF files without uploading them · docstack',
@@ -151,6 +154,67 @@ export const TASK_PAGES = [
             ['Can I put several images into one PDF?', 'Yes. Add them all, drag them into order and download one PDF.'],
             ['Can I add a photo to a PDF I already have?', 'Yes. Open the PDF, then drop the image where you want it or insert it between two pages.'],
             ['Can I turn a PDF back into images?', 'No. docstack makes PDFs; it does not save pages as image files.'],
+        ],
+    },
+    {
+        slug: 'offline-pdf-merger',
+        title: 'An offline PDF merger that runs in your browser · docstack',
+        description: 'Merge, reorder, rotate and redact PDFs with no internet connection. Open docstack once, go offline and keep working. Nothing to install, and nothing is uploaded.',
+        heading: 'Merge PDFs offline, privately.',
+        lede: 'Open this page, then turn off Wi‑Fi. PDFs and images are still merged and arranged on this device.',
+        aboutHeading: 'Merge PDFs with no internet connection',
+        aboutIntro: 'docstack is a web page that does its work on your device. Once it has loaded, it needs nothing more from the network for PDFs and images, so you can disconnect and keep working.',
+        steps: [
+            ['Open docstack while online', 'Load this page and give it a few seconds. The parts that read and write PDFs are fetched right after it opens.'],
+            ['Go offline', 'Turn off Wi‑Fi or unplug the cable. Keep this tab open, because opening the page again needs a connection.'],
+            ['Merge and download', 'Add PDFs and images, arrange the pages and download the result. The PDF is written by your browser, not fetched from a server.'],
+        ],
+        factsHeading: 'What works without a connection',
+        facts: [
+            ['Works offline', 'Opening PDFs and images, reordering, rotating and deleting pages, inserting blank pages, redacting, and downloading the merged PDF.'],
+            ['Needs a connection', 'Loading the page in the first place, and converting PowerPoint and Word files.'],
+            ['Nothing to install', 'docstack is not a program you download. It runs in the browser you already have, with no account.'],
+            ['A way to check', 'A tool that keeps working with the connection off is not relying on a server to handle your files. It is a simple way to test a privacy claim yourself.'],
+        ],
+        questions: [
+            ['Do I need to install anything to merge PDFs offline?', 'No. Open docstack in your browser while you are online, then disconnect. There is no installer.'],
+            ['Can I open docstack with no connection at all?', 'Not the first time, and not after closing the tab. The page has to load once while you are online; after that it keeps working until you close it.'],
+            ['Is it slower offline?', 'No. The work was always done on your device, so the connection makes no difference to PDFs and images.'],
+            ['Can I convert Word files offline?', 'No. Converting PowerPoint and Word files needs a connection. PDFs and images do not.'],
+        ],
+    },
+    {
+        slug: 'ilovepdf-alternative',
+        title: 'A private, open source alternative to iLovePDF · docstack',
+        description: 'docstack merges, arranges and redacts PDFs in your browser, not on a server. Free and open source. See how it compares with iLovePDF and what it leaves out.',
+        heading: 'A private alternative to iLovePDF.',
+        lede: 'Nothing is uploaded. docstack merges, arranges and redacts PDFs on this device, and its code is open source.',
+        aboutHeading: 'An open source alternative to iLovePDF',
+        aboutIntro: 'iLovePDF is a large set of online PDF tools that work on files you upload. docstack does fewer things, and does them on your device: the files you add are never sent to a server. Here is how the two compare.',
+        // Everything said about iLovePDF comes from its own help, pricing and home pages. Check those
+        // pages again before changing a row, and update the date in the note.
+        comparison: {
+            columns: ['docstack', 'iLovePDF'],
+            rows: [
+                ['Where files go', 'Nowhere. They are opened and merged in your browser tab.', 'To its servers. iLovePDF says files are deleted within two hours of being processed.'],
+                ['Offline', 'PDFs and images keep working once the page has loaded.', 'The website needs a connection. There is a separate desktop app.'],
+                ['Price', 'Free. There is no paid plan.', 'Free with limits on processing and file size. A paid plan removes them.'],
+                ['Source code', 'Open source under the MIT License.', 'Not open source.'],
+                ['Tools', 'Merge, reorder, rotate, delete, insert, extract and redact pages. Converts images, Word and PowerPoint to PDF.', 'Many more, including compress, split, PDF to Word, OCR and signing.'],
+            ],
+            note: 'Details about iLovePDF are from its own help and pricing pages in October 2026 and may have changed.',
+        },
+        factsHeading: 'Which one to use',
+        facts: [
+            ['Use docstack', 'When the document is private, when you want to see and arrange every page before merging, or when you would rather not upload anything.'],
+            ['Use iLovePDF', 'When you need something docstack does not do, such as compressing a PDF, converting a PDF to Word, running OCR or collecting signatures.'],
+            ['Not included', 'docstack does not compress PDFs, split one into several files in a single step, convert PDFs into other formats, recognise text in scans or sign documents.'],
+        ],
+        questions: [
+            ['Is docstack connected with iLovePDF?', 'No. docstack is an independent open source project and has no connection with iLovePDF.'],
+            ['Is an online PDF tool safe for private documents?', 'It depends on where the work happens. A tool that uploads your file asks you to trust how it is stored and deleted. docstack never receives the file, so that question does not come up.'],
+            ['Can I check that nothing is uploaded?', 'Yes. Turn off Wi‑Fi after the page has loaded and keep working, or read the code on GitHub.'],
+            ['Does docstack limit file size?', NO_LIMIT],
         ],
     },
 ];
